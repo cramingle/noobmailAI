@@ -1,14 +1,12 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { writable } from 'svelte/store';
-    import type { SmtpConfig, RecipientGroup, ChatMessage, Template } from '$lib/types';
+    import type { SmtpConfig, RecipientGroup, ChatMessage } from '$lib/types';
     import Header from '../../components/layout/Header.svelte';
     import ChatPanel from '../../components/chat/ChatPanel.svelte';
     import NewsletterEditor from '../../components/editor/NewsletterEditor.svelte';
     import SmtpSettings from '../../components/settings/SmtpSettings.svelte';
     import RecipientsManager from '../../components/settings/RecipientsManager.svelte';
     import OnboardingGuide from '../../components/OnboardingGuide.svelte';
-    import { slide } from 'svelte/transition';
     import { showOnboarding } from '$lib/stores';
     import { PUBLIC_API_URL } from '$env/static/public';
 

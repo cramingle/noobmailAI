@@ -9,9 +9,9 @@
 
     export let chatMessages: ChatMessage[] = [];
     export let isGenerating = false;
-    export let quotaInfo = { remaining_chats: 10, max_chats: 10 };
-    export let showQuotaWarning = false;
-    export let showChatPanel = true;
+    let quotaInfo = { remaining_chats: 10, max_chats: 10 };
+    let showQuotaWarning = false;
+    let showChatPanel = true;
 
     const dispatch = createEventDispatcher<{
         update: { message: string } | { showChatPanel: boolean };

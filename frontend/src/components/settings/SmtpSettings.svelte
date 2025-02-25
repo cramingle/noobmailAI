@@ -172,9 +172,10 @@
 
     <div class="space-y-4">
         <div>
-            <label class="block text-sm font-medium mb-1">SMTP Server</label>
+            <label for="smtp-server" class="block text-sm font-medium mb-1">SMTP Server</label>
             <div class="relative">
                 <input
+                    id="smtp-server"
                     type="text"
                     bind:value={smtpConfig.server}
                     placeholder="e.g., smtp.gmail.com"
