@@ -188,9 +188,10 @@
             </div>
         </div>
         <div>
-            <label class="block text-sm font-medium mb-1">Port</label>
+            <label for="smtp-port" class="block text-sm font-medium mb-1">Port</label>
             <div class="relative">
                 <input
+                    id="smtp-port"
                     type="text"
                     bind:value={smtpConfig.port}
                     placeholder="587 or 465"
@@ -203,8 +204,9 @@
             </div>
         </div>
         <div>
-            <label class="block text-sm font-medium mb-1">Email</label>
+            <label for="smtp-email" class="block text-sm font-medium mb-1">Email</label>
             <input
+                id="smtp-email"
                 type="email"
                 bind:value={smtpConfig.email}
                 placeholder="your@email.com"
@@ -213,9 +215,10 @@
             />
         </div>
         <div>
-            <label class="block text-sm font-medium mb-1">Password</label>
+            <label for="smtp-password" class="block text-sm font-medium mb-1">Password</label>
             <div class="relative">
                 <input
+                    id="smtp-password"
                     type="password"
                     bind:value={smtpConfig.password}
                     placeholder="SMTP Password or App Password"
@@ -228,8 +231,9 @@
             </div>
         </div>
         <div>
-            <label class="block text-sm font-medium mb-1">Sender Name</label>
+            <label for="smtp-sender" class="block text-sm font-medium mb-1">Sender Name</label>
             <input
+                id="smtp-sender"
                 type="text"
                 bind:value={smtpConfig.name}
                 placeholder="Your Name"
