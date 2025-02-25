@@ -17,7 +17,7 @@ const config = {
 			runtime: 'nodejs18.x',
 			split: false,
 			external: [],
-			regions: ['sin1'],
+			regions: ['sin1']
 		}),
 		alias: {
 			$lib: './src/lib',
