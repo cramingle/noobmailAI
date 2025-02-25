@@ -1,0 +1,9 @@
+{
+  "projectSettings": {
+    "framework": "sveltekit",
+    "buildCommand": "npm run build",
+    "outputDirectory": ".svelte-kit/output",
+    "rootDirectory": "frontend",
+    "devCommand": "npm run dev"
+  }
+} 
