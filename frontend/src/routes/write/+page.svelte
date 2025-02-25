@@ -101,6 +101,27 @@
     function handleTabChange(event: CustomEvent<string>) {
         activeTab = event.detail;
     }
+
+    function handleChatUpdate(event: CustomEvent) {
+        if ('message' in event.detail) {
+            chatMessages = [...chatMessages, { 
+                role: 'user', 
+                content: event.detail.message,
+                timestamp: new Date()
+            }];
+            // Here you would typically make an API call to your AI service
+            // For now, we'll just echo the message back
+            setTimeout(() => {
+                chatMessages = [...chatMessages, { 
+                    role: 'assistant', 
+                    content: 'I received your message: ' + event.detail.message,
+                    timestamp: new Date()
+                }];
+            }, 1000);
+        } else if ('showChatPanel' in event.detail) {
+            showChatPanel = event.detail.showChatPanel;
+        }
+    }
 </script>
 
 {#if $showOnboarding}
@@ -173,7 +194,7 @@
                     <ChatPanel 
                         bind:chatMessages
                         bind:isGenerating
-                        on:contentUpdate={handleContentUpdate}
+                        on:update={handleChatUpdate}
                     />
                 </div>
             </div>
