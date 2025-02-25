@@ -7,6 +7,16 @@
   "regions": ["sin1"],
   "routes": [
     {
+      "src": "/.*",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-prerender-revalidate"
+        }
+      ],
+      "continue": true
+    },
+    {
       "src": "/(.*)",
       "headers": {
         "Cache-Control": "public, max-age=0, must-revalidate"
@@ -32,7 +42,8 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/$1"
+      "dest": "/",
+      "status": 200
     }
   ],
   "headers": [
