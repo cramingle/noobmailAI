@@ -49,5 +49,10 @@
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
 		"drizzle-orm": "^0.38.4"
+	},
+	"optionalDependencies": {
+		"@neon-rs/load": "^0.0.4",
+		"bufferutil": "^4.0.8",
+		"utf-8-validate": "^6.0.3"
 	}
 }
