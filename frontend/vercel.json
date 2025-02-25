@@ -7,70 +7,14 @@
   "regions": ["sin1"],
   "routes": [
     {
-      "src": "/.*",
-      "has": [
-        {
-          "type": "header",
-          "key": "x-prerender-revalidate"
-        }
-      ],
-      "continue": true
-    },
-    {
       "src": "/(.*)",
-      "headers": {
-        "Cache-Control": "public, max-age=0, must-revalidate"
-      },
-      "continue": true
-    },
-    {
-      "src": "/static/(.*)",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      },
-      "continue": true
-    },
-    {
-      "src": "/(.*\\.(js|css|svg|jpg|jpeg|png|gif|ico|woff|woff2)$)",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      },
-      "continue": true
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/",
-      "status": 200
+      "dest": "/fn"
     }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=()"
-        }
-      ]
+  "functions": {
+    "fn": {
+      "memory": 1024,
+      "maxDuration": 10
     }
-  ]
+  }
 } 
