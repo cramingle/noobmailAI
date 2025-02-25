@@ -5,6 +5,7 @@
     import { fade } from 'svelte/transition';
     import ContextManager from './ContextManager.svelte';
     import { onMount } from 'svelte';
+    import { PUBLIC_AI_SERVICE_URL } from '$env/static/public';
 
     export let chatMessages: ChatMessage[] = [];
     export let isGenerating = false;
@@ -20,7 +21,7 @@
 
     onMount(async () => {
         try {
-            const response = await fetch('http://localhost:8001/quota');
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/quota`);
             if (response.ok) {
                 quotaInfo = await response.json();
                 showQuotaWarning = quotaInfo.remaining_chats <= 2;

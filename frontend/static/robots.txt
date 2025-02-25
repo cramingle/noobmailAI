@@ -2,5 +2,6 @@
 User-agent: *
 Allow: /
 
-# Sitemap location
-Sitemap: https://noobmail.ai/sitemap.xml 
+# Sitemap locations
+Sitemap: https://noobmail.ai/sitemap.xml
+Sitemap: https://noobmail-ai.vercel.app/sitemap.xml 

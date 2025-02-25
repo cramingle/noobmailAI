@@ -8,13 +8,20 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid, formataddr
 from email_service import send_email, improve_content
 from ai_service import ai_service
+import os
 
 app = FastAPI(title="SimpleMail AI")
+
+# Get allowed origins from environment or use defaults
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS", 
+    "http://localhost:5173,http://localhost:3000,https://noobmail.ai,https://noobmail-ai.vercel.app"
+).split(",")
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Svelte dev server
+    allow_origins=ALLOWED_ORIGINS,  # Allow both dev and production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

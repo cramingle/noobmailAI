@@ -2,6 +2,7 @@
 <script lang="ts">
     import type { SmtpConfig, EmailProvider } from '$lib/types';
     import { slide } from 'svelte/transition';
+    import { PUBLIC_API_URL } from '$env/static/public';
 
     export let smtpConfig: SmtpConfig;
     
@@ -16,7 +17,7 @@
     async function detectSmtpSettings() {
         isDetectingConfig = true;
         try {
-            const response = await fetch('http://localhost:8000/detect-smtp', {
+            const response = await fetch(`${PUBLIC_API_URL}/detect-smtp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: smtpConfig.email })
@@ -78,7 +79,7 @@
     async function testSmtpConfig() {
         isTestingConfig = true;
         try {
-            const response = await fetch('http://localhost:8000/test-smtp', {
+            const response = await fetch(`${PUBLIC_API_URL}/test-smtp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(smtpConfig)
