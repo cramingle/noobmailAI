@@ -1,0 +1,11 @@
+fastapi==0.110.0
+uvicorn==0.27.1
+pydantic==2.6.3
+pydantic[email]
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+beautifulsoup4==4.12.3 
+anthropic==0.21.2
+openai==1.14.0
+python-dotenv==1.0.1 
