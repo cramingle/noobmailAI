@@ -16,7 +16,6 @@ const config = {
 			// default options are shown
 			runtime: 'nodejs18.x',
 			split: false,
-			edge: false,
 			external: [],
 			regions: ['sin1'],
 		}),
