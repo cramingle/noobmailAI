@@ -15,7 +15,10 @@ const config = {
 		adapter: adapter({
 			// default options are shown
 			runtime: 'nodejs18.x',
-			split: false
+			split: false,
+			edge: false,
+			external: [],
+			regions: ['sin1'],
 		}),
 		alias: {
 			$lib: './src/lib',
