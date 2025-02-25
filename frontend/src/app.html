@@ -1,1 +1,56 @@
- 
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+		<meta name="theme-color" content="#1a1a1a" />
+		<meta name="color-scheme" content="dark" />
+		
+		<!-- PWA Support -->
+		<link rel="manifest" href="%sveltekit.assets%/manifest.json" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/icon-192x192.png" />
+		
+		<!-- Primary Meta Tags -->
+		<meta name="description" content="Create and send beautiful newsletters without any technical knowledge. AI-powered newsletter editor for beginners." />
+		<meta name="keywords" content="newsletter, AI, email marketing, newsletter editor, email templates" />
+		<meta name="author" content="NoobMail AI" />
+		
+		<!-- Open Graph / Facebook -->
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="%sveltekit.env.PUBLIC_BASE_URL%" />
+		<meta property="og:title" content="NoobMail AI - Newsletter Management Made Simple" />
+		<meta property="og:description" content="Create and send beautiful newsletters without any technical knowledge. AI-powered newsletter editor for beginners." />
+		<meta property="og:image" content="%sveltekit.assets%/og-image.png" />
+		
+		<!-- Twitter -->
+		<meta property="twitter:card" content="summary_large_image" />
+		<meta property="twitter:url" content="%sveltekit.env.PUBLIC_BASE_URL%" />
+		<meta property="twitter:title" content="NoobMail AI - Newsletter Management Made Simple" />
+		<meta property="twitter:description" content="Create and send beautiful newsletters without any technical knowledge. AI-powered newsletter editor for beginners." />
+		<meta property="twitter:image" content="%sveltekit.assets%/og-image.png" />
+		
+		<!-- Canonical URL -->
+		<link rel="canonical" href="%sveltekit.env.PUBLIC_BASE_URL%" />
+		
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+		
+		<!-- Service Worker Registration -->
+		<script>
+			if ('serviceWorker' in navigator) {
+				window.addEventListener('load', () => {
+					navigator.serviceWorker.register('/service-worker.js')
+						.then(registration => {
+							console.log('Service Worker registered with scope:', registration.scope);
+						})
+						.catch(error => {
+							console.error('Service Worker registration failed:', error);
+						});
+				});
+			}
+		</script>
+	</body>
+</html> 
