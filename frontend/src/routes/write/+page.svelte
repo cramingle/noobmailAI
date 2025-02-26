@@ -375,7 +375,7 @@
             {#if activeTab === 'settings'}
                 <!-- Settings Panel -->
                 <div class="flex-1 p-2 md:p-4 overflow-auto">
-                    <div class="max-w-4xl mx-auto">
+                    <div class="max-w-5xl mx-auto">
                         <div class="bg-[#2d2d2d] rounded-lg shadow-xl">
                             <!-- Settings Tabs -->
                             <div class="border-b border-gray-800">
@@ -398,7 +398,7 @@
                             </div>
 
                             <!-- Settings Content -->
-                            <div class="p-3 md:p-6">
+                            <div class="p-3 md:p-4 lg:p-5">
                                 {#if settingsTab === 'recipients'}
                                     <RecipientsManager bind:recipientGroups bind:activeGroup />
                                 {:else}
