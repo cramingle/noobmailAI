@@ -6,18 +6,17 @@
     const dispatch = createEventDispatcher<{
         stepChange: number;
         complete: void;
+        useTemplate: string;
     }>();
     export let currentStep = 1;
 
     interface Feature {
-        icon: string;
         title: string;
         description: string;
     }
 
     interface Provider {
         name: string;
-        icon: string;
         setup: string;
     }
 
@@ -27,6 +26,12 @@
         detail: string;
     }
 
+    interface Template {
+        title: string;
+        description: string;
+        prompt: string;
+    }
+
     interface Step {
         title: string;
         description: string;
@@ -34,8 +39,8 @@
         steps?: string[];
         instructions?: Instruction[];
         providers?: Provider[];
+        templates?: Template[];
         tip?: string;
-        image: string;
     }
 
     const steps: Step[] = [
@@ -44,34 +49,63 @@
             description: "Your AI-powered newsletter assistant",
             features: [
                 {
-                    icon: "",
                     title: "AI Writing Assistant",
                     description: "Just describe what you want, and AI creates it"
                 },
                 {
-                    icon: "",
                     title: "Example Newsletters",
                     description: "Get inspired by pre-made examples"
                 },
                 {
-                    icon: "",
                     title: "Quick & Easy",
                     description: "Create newsletters in minutes, not hours"
                 }
             ],
-            image: "/onboarding/welcome.png"
+            templates: [
+                {
+                    title: "Welcome Email",
+                    description: "Perfect for new subscribers",
+                    prompt: "Create a welcome newsletter with a modern design"
+                },
+                {
+                    title: "Product Announcement",
+                    description: "Showcase your latest offerings",
+                    prompt: "Generate a product announcement with images and CTAs"
+                },
+                {
+                    title: "Monthly Update",
+                    description: "Keep your audience informed",
+                    prompt: "Make a monthly update newsletter with sections"
+                }
+            ]
         },
         {
-            title: "Make It Personal",
-            description: "Help AI understand your style",
+            title: "Using Context Files",
+            description: "Make your newsletters truly yours",
             steps: [
-                "Upload your brand guidelines",
-                "Add previous newsletters",
-                "Include any reference materials",
-                "AI uses these to match your style"
+                "Upload brand guidelines or style documents",
+                "Add previous newsletters as examples",
+                "Reference files with @filename in your prompts",
+                "AI adapts to your style and content"
             ],
-            tip: "💡 The more context you provide, the better the results!",
-            image: "/onboarding/context.png"
+            tip: "💡 Type @filename in your message to reference a specific context file!",
+            instructions: [
+                {
+                    step: "1",
+                    action: "Add files to Context Library",
+                    detail: "Click '+ Add Context' in the right panel"
+                },
+                {
+                    step: "2",
+                    action: "Reference in your prompt",
+                    detail: "Type @filename when asking the AI for help"
+                },
+                {
+                    step: "3",
+                    action: "See highlighted references",
+                    detail: "Context files appear in purple when mentioned"
+                }
+            ]
         },
         {
             title: "Manage Your Audience",
@@ -92,8 +126,7 @@
                     action: "Add your contacts",
                     detail: "Import or add them manually"
                 }
-            ],
-            image: "/onboarding/recipients.png"
+            ]
         },
         {
             title: "Ready to Send!",
@@ -101,22 +134,18 @@
             providers: [
                 {
                     name: "Gmail",
-                    icon: "",
                     setup: "Use App Password if 2FA enabled"
                 },
                 {
                     name: "Outlook",
-                    icon: "",
                     setup: "Regular password or App Password"
                 },
                 {
                     name: "Custom SMTP",
-                    icon: "",
                     setup: "Your own email server"
                 }
             ],
-            tip: "Need help? Click the AI Setup Helper in SMTP settings!",
-            image: "/onboarding/smtp.png"
+            tip: "Need help? Click the AI Setup Helper in SMTP settings!"
         }
     ];
 
@@ -130,6 +159,12 @@
 
     function handleSkip() {
         dispatch('complete');
+    }
+    
+    function useTemplate(prompt: string) {
+        // Close the onboarding guide and set the prompt
+        dispatch('complete');
+        dispatch('useTemplate', prompt);
     }
 </script>
 
@@ -159,16 +194,33 @@
                         <div class="grid grid-cols-3 gap-4">
                             {#each steps[0].features as feature}
                                 <div class="bg-[#2d2d2d]/50 rounded-lg p-4 text-center hover:bg-[#2d2d2d] transition-all">
-                                    <div class="text-2xl mb-2">{feature.icon}</div>
                                     <h3 class="font-medium text-purple-400 mb-1">{feature.title}</h3>
                                     <p class="text-sm text-gray-400">{feature.description}</p>
                                 </div>
                             {/each}
                         </div>
                     {/if}
+                    
+                    {#if steps[0].templates}
+                        <div>
+                            <h3 class="text-xl font-medium text-white mb-4 text-center">Try these templates</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {#each steps[0].templates as template}
+                                    <button 
+                                        class="bg-[#2d2d2d]/50 rounded-lg p-4 text-left hover:bg-[#2d2d2d] transition-all border border-transparent hover:border-purple-500/30"
+                                        on:click={() => useTemplate(template.prompt)}
+                                    >
+                                        <h4 class="font-medium text-purple-400 mb-1">{template.title}</h4>
+                                        <p class="text-sm text-gray-400 mb-3">{template.description}</p>
+                                        <div class="text-xs bg-[#1a1a1a] p-2 rounded text-gray-300">"{template.prompt}"</div>
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             {:else if currentStep === 2}
-                <div class="grid grid-cols-2 gap-8 items-center">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     <div class="space-y-6">
                         <div>
                             <h2 class="text-2xl font-bold text-white mb-2">{steps[1].title}</h2>
@@ -192,12 +244,35 @@
                             </div>
                         {/if}
                     </div>
-                    <div class="flex items-center justify-center">
-                        <div class="text-6xl">🎯</div>
+                    
+                    <div class="space-y-4">
+                        {#if steps[1].instructions}
+                            <div class="space-y-4">
+                                {#each steps[1].instructions as instruction}
+                                    <div class="flex items-start space-x-4 bg-[#2d2d2d]/50 p-4 rounded-lg">
+                                        <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center text-white font-medium">
+                                            {instruction.step}
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-white">{instruction.action}</div>
+                                            <div class="text-sm text-gray-400">{instruction.detail}</div>
+                                        </div>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                        
+                        <!-- Example of @filename usage -->
+                        <div class="mt-4 bg-[#1a1a1a] rounded-lg p-4">
+                            <div class="text-sm text-gray-400 mb-2">Example prompt with context:</div>
+                            <div class="bg-[#2d2d2d] p-3 rounded text-gray-300 text-sm">
+                                "Create a newsletter that matches the style in <span class="text-purple-400 font-semibold">@brand-guide.pdf</span> and includes information about our new product launch"
+                            </div>
+                        </div>
                     </div>
                 </div>
             {:else if currentStep === 3}
-                <div class="grid grid-cols-2 gap-8 items-center">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div class="space-y-6">
                         <div>
                             <h2 class="text-2xl font-bold text-white mb-2">{steps[2].title}</h2>
@@ -220,12 +295,23 @@
                             </div>
                         {/if}
                     </div>
-                    <div class="flex items-center justify-center">
-                        <div class="text-6xl">👥</div>
+                    <div class="bg-[#1a1a1a] rounded-lg p-6">
+                        <div class="text-center mb-4">
+                            <div class="text-4xl mb-2">👥</div>
+                            <div class="text-sm text-gray-400">Organize your contacts into groups for targeted sending</div>
+                        </div>
+                        <div class="bg-[#2d2d2d] rounded p-3 text-sm">
+                            <div class="font-medium text-white mb-1">Example Groups</div>
+                            <ul class="text-gray-400 space-y-1">
+                                <li>• All Subscribers</li>
+                                <li>• Premium Members</li>
+                                <li>• New Customers</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             {:else if currentStep === 4}
-                <div class="grid grid-cols-2 gap-8 items-center">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div class="space-y-6">
                         <div>
                             <h2 class="text-2xl font-bold text-white mb-2">{steps[3].title}</h2>
@@ -233,13 +319,10 @@
                         </div>
                         
                         {#if steps[3].providers}
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {#each steps[3].providers as provider}
                                     <div class="bg-[#2d2d2d]/50 p-4 rounded-lg">
-                                        <div class="flex items-center space-x-2 mb-2">
-                                            <span class="text-xl">{provider.icon}</span>
-                                            <span class="font-medium text-white">{provider.name}</span>
-                                        </div>
+                                        <div class="font-medium text-white mb-2">{provider.name}</div>
                                         <p class="text-sm text-gray-400">{provider.setup}</p>
                                     </div>
                                 {/each}
@@ -252,8 +335,14 @@
                             </div>
                         {/if}
                     </div>
-                    <div class="flex items-center justify-center">
-                        <div class="text-6xl">🚀</div>
+                    <div class="bg-[#1a1a1a] rounded-lg p-6">
+                        <div class="text-center mb-4">
+                            <div class="text-4xl mb-2">🚀</div>
+                            <div class="text-sm text-gray-400">Ready to send your beautiful newsletter!</div>
+                        </div>
+                        <div class="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg p-3 text-center text-white font-medium">
+                            Send Newsletter
+                        </div>
                     </div>
                 </div>
             {/if}
@@ -290,4 +379,4 @@
     :global(body) {
         overflow: hidden;
     }
-</style> 
+</style>

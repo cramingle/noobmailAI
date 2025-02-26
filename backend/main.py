@@ -9,6 +9,12 @@ from email.utils import formatdate, make_msgid, formataddr
 from email_service import send_email, improve_content
 from ai_service import ai_service
 import os
+import logging
+import re
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SimpleMail AI")
 
@@ -53,10 +59,16 @@ class ChatMessage(BaseModel):
     role: str
     content: str
 
+class ContextFile(BaseModel):
+    name: str
+    content: str
+    type: str
+
 class ChatRequest(BaseModel):
     prompt: str
     context: Optional[List[ChatMessage]] = None
     system_prompt: Optional[str] = None
+    contextFiles: Optional[List[ContextFile]] = None
 
 class NewsletterRequest(BaseModel):
     topic: str
@@ -136,24 +148,72 @@ async def improve_content_endpoint(content: ContentRequest):
 # New AI endpoints
 @app.post("/ai/chat")
 async def chat_with_ai(request: ChatRequest):
-    """
-    Chat with the AI to get help with newsletter creation.
-    """
     try:
-        # Convert context to the format expected by the AI service
-        context = None
-        if request.context:
-            context = [{"role": msg.role, "content": msg.content} for msg in request.context]
+        # Log the request for debugging
+        logger.info(f"Chat request received with prompt: {request.prompt[:50]}...")
+        if request.contextFiles:
+            logger.info(f"Context files included: {[cf.name for cf in request.contextFiles]}")
+        
+        # Build context from previous messages
+        context = request.context or []
+        
+        # Create a custom system prompt that emphasizes the importance of context files
+        custom_system_prompt = """You are an AI assistant specialized in helping users create newsletters and email content.
+Your goal is to provide helpful, accurate, and creative responses to user queries about newsletter creation.
+
+IMPORTANT: USER CONTEXT FILES
+The user may provide context files that contain important information. These files are crucial for understanding
+the user's needs and generating appropriate responses. Pay special attention to any context files mentioned
+with @filename syntax or by name in the user's message.
+"""
+        
+        # Add context files to the system prompt for better understanding
+        if request.contextFiles:
+            custom_system_prompt += "\n\nThe following context files have been provided:\n"
+            
+            for cf in request.contextFiles:
+                custom_system_prompt += f"\n--- BEGIN CONTEXT FILE: {cf.name} ---\n"
+                custom_system_prompt += cf.content
+                custom_system_prompt += f"\n--- END CONTEXT FILE: {cf.name} ---\n"
+            
+            # Check for @filename mentions in the prompt
+            mention_pattern = r'@(\S+)'
+            mentions = re.findall(mention_pattern, request.prompt)
+            
+            # Add mentioned context files as user messages for better visibility
+            for mention in mentions:
+                for cf in request.contextFiles:
+                    if cf.name.lower() == mention.lower():
+                        if not context:
+                            context = []
+                        context.append({
+                            "role": "user",
+                            "content": f"Here is the content of {cf.name} that I'm referring to with @{mention}:\n\n{cf.content}"
+                        })
+                        break
+            
+            # Also add the first context file as a user message if it's relevant to the current prompt
+            if not any(mentions) and request.contextFiles:
+                for cf in request.contextFiles:
+                    if request.prompt.lower().find(cf.name.lower()) >= 0:
+                        if not context:
+                            context = []
+                        context.append({
+                            "role": "user",
+                            "content": f"Here is the content of {cf.name} that I'm referring to:\n\n{cf.content}"
+                        })
+                        break
         
         # Generate response
         response = ai_service.generate_response(
             prompt=request.prompt,
             context=context,
-            system_prompt=request.system_prompt
+            system_prompt=custom_system_prompt
         )
         
         return response
     except Exception as e:
+        logger.error(f"Error in chat_with_ai: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/ai/generate-newsletter")

@@ -3,13 +3,17 @@
     import { writable, get } from 'svelte/store';
     import type { Context } from '$lib/types';
     import { slide } from 'svelte/transition';
+    import { createEventDispatcher } from 'svelte';
 
+    // Keep for compatibility, but no longer used for checkbox selection
     export let selectedContexts: string[] = [];
+    export let contexts = writable<Context[]>([]);
     
-    const contexts = writable<Context[]>([]);
     let showAddContext = false;
     let newContextText = '';
     let dragOver = false;
+    
+    const dispatch = createEventDispatcher();
 
     async function handleFileUpload(files: FileList | null | undefined) {
         if (!files) return;
@@ -49,15 +53,11 @@
 
     function removeContext(id: string) {
         contexts.update(c => c.filter(context => context.id !== id));
-        selectedContexts = selectedContexts.filter(cid => cid !== id);
     }
 
-    function toggleContextSelection(id: string) {
-        if (selectedContexts.includes(id)) {
-            selectedContexts = selectedContexts.filter(cid => cid !== id);
-        } else {
-            selectedContexts = [...selectedContexts, id];
-        }
+    function insertContextMention(context: Context) {
+        // Dispatch an event to insert @filename in the message
+        dispatch('insertMention', context.name);
     }
 
     function handleInputChange(event: Event) {
@@ -142,21 +142,33 @@
         </div>
     {/if}
 
+    <!-- Context Usage Hint -->
+    {#if $contexts.length > 0}
+        <div class="text-xs text-purple-400 bg-purple-500/10 p-2 rounded-lg">
+            Reference contexts by typing <span class="font-semibold">@filename</span> in your message
+        </div>
+    {/if}
+
     <!-- Context List -->
     <div class="space-y-2 max-h-48 overflow-y-auto pr-2">
         {#each $contexts as context}
-            <div class="bg-[#1a1a1a] rounded-lg p-2 flex items-start space-x-2">
-                <input
-                    type="checkbox"
-                    checked={selectedContexts.includes(context.id)}
-                    on:change={() => toggleContextSelection(context.id)}
-                    class="mt-1"
-                />
+            <div 
+                class="bg-[#1a1a1a] rounded-lg p-2 flex items-start space-x-2 hover:bg-gray-800 cursor-pointer transition-colors"
+                on:click={() => insertContextMention(context)}
+                on:keydown={(e) => e.key === 'Enter' && insertContextMention(context)}
+                tabindex="0"
+                role="button"
+            >
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium truncate">{context.name}</span>
+                        <span class="text-sm font-medium truncate">
+                            <span class="text-purple-400">@</span>{context.name}
+                        </span>
                         <button
-                            on:click={() => removeContext(context.id)}
+                            on:click={(e) => {
+                                e.stopPropagation();
+                                removeContext(context.id);
+                            }}
                             class="text-gray-500 hover:text-red-400 transition-colors text-xs"
                         >
                             ×
