@@ -11,6 +11,9 @@ from ai_service import ai_service
 import os
 import logging
 import re
+from scheduler_service import NewsletterSchedulerService
+from datetime import datetime
+from sqlalchemy.orm import Session
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -81,9 +84,19 @@ class QuotaResponse(BaseModel):
     remaining_emails: int
     max_emails: int
 
+class ScheduleNewsletterRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    template_content: str
+    recipient_group: str
+    frequency: str  # 'monthly' or 'weekly'
+    start_date: datetime
+
 # Email quota tracking
 email_count = 0
 max_email_count = 1  # Only allow one email per IP
+
+scheduler_service = NewsletterSchedulerService()
 
 @app.post("/test-smtp")
 async def test_smtp(config: SmtpConfig):
@@ -258,6 +271,90 @@ async def reset_quota():
         "status": "success",
         "message": "Quota has been reset"
     }
+
+@app.post("/schedule-newsletter")
+async def schedule_newsletter(request: ScheduleNewsletterRequest):
+    """Schedule a recurring newsletter"""
+    try:
+        result = await scheduler_service.schedule_newsletter(
+            name=request.name,
+            description=request.description,
+            template_content=request.template_content,
+            recipient_group=request.recipient_group,
+            frequency=request.frequency,
+            start_date=request.start_date
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/scheduled-newsletters")
+async def get_scheduled_newsletters():
+    """Get all scheduled newsletters"""
+    session = Session()
+    try:
+        schedules = session.query(NewsletterSchedule).all()
+        return [
+            {
+                "id": s.id,
+                "name": s.name,
+                "description": s.description,
+                "recipient_group": s.recipient_group,
+                "frequency": s.frequency,
+                "next_send_date": s.next_send_date,
+                "last_sent_date": s.last_sent_date,
+                "is_active": s.is_active
+            }
+            for s in schedules
+        ]
+    finally:
+        session.close()
+
+@app.put("/schedule-newsletter/{schedule_id}")
+async def update_newsletter_schedule(schedule_id: int, request: ScheduleNewsletterRequest):
+    """Update a scheduled newsletter"""
+    session = Session()
+    try:
+        schedule = session.query(NewsletterSchedule).get(schedule_id)
+        if not schedule:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        schedule.name = request.name
+        schedule.description = request.description
+        schedule.template_content = request.template_content
+        schedule.recipient_group = request.recipient_group
+        schedule.frequency = request.frequency
+        schedule.next_send_date = request.start_date
+        
+        session.commit()
+        
+        # Update the scheduler job
+        scheduler_service._add_newsletter_job(schedule)
+        
+        return {"status": "success", "message": "Schedule updated successfully"}
+    finally:
+        session.close()
+
+@app.delete("/schedule-newsletter/{schedule_id}")
+async def delete_newsletter_schedule(schedule_id: int):
+    """Delete a scheduled newsletter"""
+    session = Session()
+    try:
+        schedule = session.query(NewsletterSchedule).get(schedule_id)
+        if not schedule:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        # Remove the scheduler job
+        job_id = f"newsletter_{schedule_id}"
+        scheduler_service.scheduler.remove_job(job_id)
+        
+        # Delete from database
+        session.delete(schedule)
+        session.commit()
+        
+        return {"status": "success", "message": "Schedule deleted successfully"}
+    finally:
+        session.close()
 
 if __name__ == "__main__":
     import uvicorn

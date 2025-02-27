@@ -5,6 +5,7 @@ import requests
 from typing import List, Dict, Any, Optional
 import logging
 from dotenv import load_dotenv
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -324,80 +325,88 @@ class AIService:
                 "message": f"An error occurred while generating the AI response: {str(e)}. Please check your API keys in the .env file or try again later."
             }
     
-    def generate_newsletter_html(self, 
-                               topic: str, 
-                               content_details: Dict[str, Any],
-                               style_preferences: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Generate a complete newsletter HTML based on the provided topic and content details.
-        
-        Args:
-            topic: The main topic or subject of the newsletter
-            content_details: Details about the content to include
-            style_preferences: Optional styling preferences
-            
-        Returns:
-            Dictionary containing the generated HTML and metadata
-        """
-        # Create a detailed prompt for newsletter generation
-        prompt = f"""
-        Create a complete HTML newsletter on the topic: {topic}
-        
-        Content details:
-        - Main headline: {content_details.get('headline', 'Newsletter')}
-        - Sections: {', '.join(content_details.get('sections', []))}
-        - Call to action: {content_details.get('cta', 'Subscribe for more')}
-        
-        Style preferences:
-        """
-        
+    def generate_newsletter_html(self, content: str, style_preferences: Optional[str] = None, email_type: str = "newsletter") -> str:
+        # Construct the prompt based on email type
+        prompt = f"""Task: Generate an HTML email template for a {email_type}.
+
+Requirements:
+- Professional structure
+- Clean HTML format
+- Include subject line, greeting, body, and signature
+- Focus on {content}
+
+Technical requirements:
+- Use semantic HTML5
+- Include proper meta tags
+- Ensure mobile responsiveness
+- Keep styling minimal and professional
+"""
+
         if style_preferences:
-            prompt += f"""
-            - Color scheme: {style_preferences.get('colors', 'Professional')}
-            - Layout: {style_preferences.get('layout', 'Single column')}
-            - Image placement: {style_preferences.get('images', 'Top of sections')}
-            """
+            prompt += f"\nStyle preferences:\n{style_preferences}"
+
+        prompt += "\nPlease output the HTML template:"
+
+        # Generate the HTML content
+        response = self.generate_response(prompt)
         
-        prompt += """
-        Please provide the complete HTML code for this newsletter, ensuring it is:
-        1. Mobile-responsive
-        2. Well-structured with proper HTML tags
-        3. Ready to be used in an email campaign
-        4. Includes placeholder text for all sections
-        5. Has a clean, professional design
+        # Clean up the response
+        html_content = self._extract_html_from_response(response)
+        if not html_content:
+            raise ValueError("Failed to generate valid HTML content")
+            
+        # Apply anti-spam optimizations
+        html_content = self._optimize_for_spam_filters(html_content, email_type)
+        html_content = self._enforce_email_best_practices(html_content, email_type)
         
-        Return ONLY the HTML code without any explanations.
-        """
+        return html_content
+
+    def _optimize_for_spam_filters(self, html: str, email_type: str) -> str:
+        # Remove potential spam triggers
+        html = re.sub(r'(?i)urgent|act now|limited time', '', html)
+        html = re.sub(r'[!]{2,}', '!', html)  # Remove multiple exclamation marks
         
-        system_prompt = """
-        You are an expert newsletter designer. Your task is to create complete, ready-to-use HTML email templates.
+        if email_type == "job_application":
+            # Remove job application clichés
+            html = re.sub(r'(?i)perfect candidate|ideal fit|perfect fit', 'strong candidate', html)
+            html = re.sub(r'(?i)synergy|think outside the box', '', html)
+        else:
+            # Remove newsletter spam patterns
+            html = re.sub(r'(?i)free|guarantee|winner|prize', '', html)
+            html = re.sub(r'(?i)buy now|order now|click here', 'learn more', html)
         
-        Follow these guidelines:
-        - Use table-based layouts for maximum email client compatibility
-        - Include inline CSS for styling
-        - Create mobile-responsive designs
-        - Use placeholder text that matches the requested content
-        - Follow email marketing best practices
-        - Return ONLY the HTML code without explanations or markdown formatting
-        """
+        return html
+
+    def _enforce_email_best_practices(self, html: str, email_type: str) -> str:
+        # Ensure required meta tags
+        if '<head>' not in html:
+            html = f'<head><meta charset="UTF-8"></head>{html}'
         
-        # Generate the newsletter HTML
-        response = self.generate_response(prompt, system_prompt=system_prompt)
+        # Add viewport meta tag if missing
+        if 'viewport' not in html:
+            viewport_tag = '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+            html = html.replace('</head>', f'{viewport_tag}</head>')
         
-        # If successful, extract just the HTML code
+        if email_type == "job_application":
+            # Ensure signature block exists
+            if '<div class="signature"' not in html:
+                signature = '\n<div class="signature">\n<p>Best regards,</p>\n<p>[Your name]</p>\n</div>'
+                html = html.replace('</body>', f'{signature}</body>')
+        
+        return html
+
+    def _extract_html_from_response(self, response: Dict[str, Any]) -> Optional[str]:
+        """Extract HTML content from the model's response"""
         if response["success"]:
-            # Clean up the response to extract just the HTML
             html_content = response["message"]
             
-            # Remove any markdown code block formatting if present
-            if "```html" in html_content:
-                html_content = html_content.split("```html")[1].split("```")[0].strip()
-            elif "```" in html_content:
+            # If the response is wrapped in code blocks, extract it
+            if "```" in html_content:
                 html_content = html_content.split("```")[1].split("```")[0].strip()
-                
-            response["html_content"] = html_content
             
-        return response
+            return html_content
+        else:
+            return None
     
     def reset_chat_count(self):
         """Reset the chat count for the user."""

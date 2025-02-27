@@ -10,15 +10,23 @@
     import Notification from '../../components/Notification.svelte';
     import { showOnboarding } from '$lib/stores';
     import { PUBLIC_API_URL, PUBLIC_AI_SERVICE_URL } from '$env/static/public';
+    import { writable } from 'svelte/store';
+    import NewsletterScheduler from '../../components/settings/NewsletterScheduler.svelte';
 
     // Update page title
-    const title = "NoobMail AI - Newsletter Management Made Simple";
+    const title = "NoobMail AI - Sending Beautiful and Professional Emails Easily";
     const description = "Create and send beautiful newsletters without any technical knowledge. AI-powered newsletter editor for beginners.";
 
     let onboardingStep = 1;
     let isSidebarCollapsed = false;
     let templatePrompt = '';
     let chatPanelComponent: ChatPanel;
+
+    // Email type state
+    let emailType: "newsletter" | "job_application" = "newsletter";
+
+    // New state for sidebar navigation
+    let activeSidebarTab: 'recipients' | 'scheduler' | 'smtp' = 'recipients';
 
     onMount(() => {
         document.title = title;
@@ -65,9 +73,6 @@
 
     // State
     let htmlContent = '';
-    let activeTab = 'main';
-    let settingsTab = 'recipients';
-    let isSending = false;
     let showChatPanel = true;
     let chatMessages: ChatMessage[] = [];
     let isGenerating = false;
@@ -92,41 +97,8 @@
     ];
     let activeGroup = recipientGroups[0];
 
-    async function sendEmail() {
-        isSending = true;
-        let error = '';
-        
-        try {
-            const response = await fetch(`${PUBLIC_API_URL}/send-email`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    content: htmlContent,
-                    recipients: activeGroup.recipients,
-                    smtp: smtpConfig
-                })
-            });
-
-            if (!response.ok) {
-                error = 'Failed to send email';
-                showNotificationMessage('Failed to send email', 'error');
-            } else {
-                showNotificationMessage('Email sent successfully!', 'success');
-            }
-        } catch (e) {
-            error = 'Something went wrong. Please try again.';
-            showNotificationMessage('Something went wrong. Please try again.', 'error');
-        } finally {
-            isSending = false;
-        }
-    }
-
     function handleContentUpdate(event: CustomEvent<string>) {
         htmlContent = event.detail;
-    }
-
-    function handleTabChange(event: CustomEvent<string>) {
-        activeTab = event.detail;
     }
     
     function showNotificationMessage(message: string, type: 'success' | 'error' | 'info' = 'success') {
@@ -241,11 +213,6 @@
             // Apply the HTML to the editor
             htmlContent = event.detail.applyHtml;
             
-            // Switch to the editor tab if we're not already there
-            if (activeTab !== 'main') {
-                activeTab = 'main';
-            }
-            
             // Show a notification
             showNotificationMessage('Newsletter HTML applied to editor!', 'success');
         } else if ('notification' in event.detail) {
@@ -253,6 +220,11 @@
             const { message, type } = event.detail.notification;
             showNotificationMessage(message, type);
         }
+    }
+
+    // Handle email type change from OnboardingGuide
+    function handleEmailTypeChange(event: CustomEvent<"newsletter" | "job_application">) {
+        emailType = event.detail;
     }
 </script>
 
@@ -262,6 +234,8 @@
         on:stepChange={handleStepChange}
         on:complete={handleOnboardingComplete}
         on:useTemplate={handleUseTemplate}
+        {emailType} 
+        on:emailTypeChange={handleEmailTypeChange} 
     />
 {/if}
 
@@ -274,84 +248,122 @@
 {/if}
 
 <div class="min-h-screen bg-[#1a1a1a] text-gray-100 flex flex-col h-screen overflow-hidden">
-    <Header {activeTab} on:tabChange={handleTabChange} />
+    <Header />
 
     <!-- Main Content -->
     <div class="flex-1 flex overflow-hidden">
         <!-- Left Sidebar -->
         <div class="{isSidebarCollapsed ? 'w-12' : 'w-64'} bg-[#2d2d2d] border-r border-gray-800 flex flex-col transition-all duration-300 ease-in-out">
-            <!-- Toggle Button -->
-            <button 
-                class="p-3 text-gray-400 hover:text-white self-end"
-                on:click={toggleSidebar}
-                aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-                {#if isSidebarCollapsed}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            <!-- Sidebar Navigation -->
+            <div class="p-2 border-b border-gray-800 flex {isSidebarCollapsed ? 'flex-col' : 'gap-2'}">
+                <!-- Toggle Button -->
+                <button 
+                    class="p-2 text-gray-400 hover:text-white rounded-md hover:bg-gray-800 transition-colors"
+                    on:click={toggleSidebar}
+                    aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                >
+                    {#if isSidebarCollapsed}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                        </svg>
+                    {:else}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                        </svg>
+                    {/if}
+                </button>
+
+                <!-- Recipients Icon -->
+                <button 
+                    class="p-2 rounded-md transition-colors {activeSidebarTab === 'recipients' ? 'text-white bg-gray-800' : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
+                    on:click={() => activeSidebarTab = 'recipients'}
+                    title="Recipients"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
-                {:else}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </button>
+
+                <!-- Scheduler Icon -->
+                <button 
+                    class="p-2 rounded-md transition-colors {activeSidebarTab === 'scheduler' ? 'text-white bg-gray-800' : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
+                    on:click={() => activeSidebarTab = 'scheduler'}
+                    title="Scheduled Emails"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                {/if}
-            </button>
+                </button>
+
+                <!-- SMTP Settings Icon -->
+                <button 
+                    class="p-2 rounded-md transition-colors {activeSidebarTab === 'smtp' ? 'text-white bg-gray-800' : 'text-gray-400 hover:text-white hover:bg-gray-800'}"
+                    on:click={() => activeSidebarTab = 'smtp'}
+                    title="SMTP Settings"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </div>
             
             <!-- Sidebar Content -->
             <div class="flex-1 flex flex-col justify-between p-3">
                 <!-- Top Section -->
-                <div class="{isSidebarCollapsed ? 'hidden' : 'block'}">
-                    <h3 class="text-sm font-medium mb-2">Recipients</h3>
-                    <div class="text-sm text-gray-400 mb-4">
-                        {activeGroup.recipients.length} recipients selected
-                    </div>
+                <div class="{isSidebarCollapsed ? 'hidden' : 'block'} space-y-4">
+                    {#if activeSidebarTab === 'recipients'}
+                        <!-- Recipients Section -->
+                        <div class="bg-[#1a1a1a] rounded-lg p-3">
+                            <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                <span>Recipients</span>
+                            </h3>
+                            <div class="text-sm text-gray-400">
+                                <div class="flex items-center justify-between">
+                                    <span>{activeGroup.name}</span>
+                                    <span class="text-xs bg-gray-800 px-2 py-0.5 rounded">
+                                        {activeGroup.recipients.length}
+                                    </span>
+                                </div>
+                            </div>
+                            <RecipientsManager 
+                                bind:recipientGroups 
+                                bind:activeGroup 
+                                {htmlContent}
+                                {smtpConfig}
+                            />
+                        </div>
+                    {:else if activeSidebarTab === 'scheduler'}
+                        <!-- Scheduler Section -->
+                        <div class="bg-[#1a1a1a] rounded-lg p-3">
+                            <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Scheduled Emails</span>
+                            </h3>
+                            <NewsletterScheduler {recipientGroups} isCompact={true} />
+                        </div>
+                    {:else if activeSidebarTab === 'smtp'}
+                        <!-- SMTP Settings Section -->
+                        <div class="bg-[#1a1a1a] rounded-lg p-3">
+                            <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span>SMTP Settings</span>
+                            </h3>
+                            <SmtpSettings bind:smtpConfig />
+                        </div>
+                    {/if}
                 </div>
                 
-                <!-- Bottom Section with Send Button -->
+                <!-- Bottom Section with Chat Toggle Button -->
                 <div class="mt-auto">
-                    {#if !isSidebarCollapsed}
-                        <button
-                            on:click={sendEmail}
-                            disabled={isSending || !htmlContent || !activeGroup.recipients.length || !smtpConfig.server}
-                            class="w-full px-4 py-2 rounded-md text-sm font-medium
-                                bg-gradient-to-r from-green-600 to-emerald-600 
-                                hover:from-green-500 hover:to-emerald-500
-                                transition-all disabled:opacity-50 whitespace-nowrap"
-                        >
-                            {#if isSending}
-                                <span class="flex items-center justify-center">
-                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                                    </svg>
-                                    Sending...
-                                </span>
-                            {:else}
-                                📤 Send
-                            {/if}
-                        </button>
-                    {:else}
-                        <!-- Collapsed Send Button -->
-                        <button
-                            on:click={sendEmail}
-                            disabled={isSending || !htmlContent || !activeGroup.recipients.length || !smtpConfig.server}
-                            class="w-full p-2 rounded-md text-sm font-medium
-                                bg-gradient-to-r from-green-600 to-emerald-600 
-                                hover:from-green-500 hover:to-emerald-500
-                                transition-all disabled:opacity-50 flex justify-center"
-                            title="Send Email"
-                        >
-                            {#if isSending}
-                                <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                                </svg>
-                            {:else}
-                                📤
-                            {/if}
-                        </button>
-                    {/if}
-                    
                     <!-- Chat Toggle Button (Mobile Only) -->
                     <button
                         class="lg:hidden w-full mt-2 px-3 py-2 rounded-md text-sm font-medium
@@ -372,45 +384,7 @@
 
         <!-- Editor/Preview Section -->
         <div class="flex-1 p-2 md:p-4 flex flex-col overflow-auto">
-            {#if activeTab === 'settings'}
-                <!-- Settings Panel -->
-                <div class="flex-1 p-2 md:p-4 overflow-auto">
-                    <div class="max-w-5xl mx-auto">
-                        <div class="bg-[#2d2d2d] rounded-lg shadow-xl">
-                            <!-- Settings Tabs -->
-                            <div class="border-b border-gray-800">
-                                <div class="flex">
-                                    <button
-                                        class="px-3 md:px-4 py-3 text-sm font-medium transition-all border-b-2
-                                            {settingsTab === 'recipients' ? 'border-purple-500 text-white' : 'border-transparent text-gray-400 hover:text-white'}"
-                                        on:click={() => settingsTab = 'recipients'}
-                                    >
-                                        👥 Recipients
-                                    </button>
-                                    <button
-                                        class="px-3 md:px-4 py-3 text-sm font-medium transition-all border-b-2
-                                            {settingsTab === 'smtp' ? 'border-purple-500 text-white' : 'border-transparent text-gray-400 hover:text-white'}"
-                                        on:click={() => settingsTab = 'smtp'}
-                                    >
-                                        📧 SMTP Settings
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Settings Content -->
-                            <div class="p-3 md:p-4 lg:p-5">
-                                {#if settingsTab === 'recipients'}
-                                    <RecipientsManager bind:recipientGroups bind:activeGroup />
-                                {:else}
-                                    <SmtpSettings bind:smtpConfig />
-                                {/if}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {:else}
-                <NewsletterEditor bind:htmlContent on:contentUpdate={handleContentUpdate} />
-            {/if}
+            <NewsletterEditor bind:htmlContent on:contentUpdate={handleContentUpdate} />
         </div>
 
         <!-- Chat Panel - Hidden on mobile by default -->
@@ -429,6 +403,7 @@
                         bind:isGenerating
                         bind:this={chatPanelComponent}
                         on:update={handleChatUpdate}
+                        {emailType}
                     />
                 </div>
             </div>

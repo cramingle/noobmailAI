@@ -80,7 +80,7 @@
     <div class="h-full flex flex-col">
         <!-- Preview Header -->
         <div class="p-3 md:p-4 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-            <span class="text-sm font-medium">Newsletter Preview</span>
+            <span class="text-sm font-medium">Preview</span>
             <div class="flex space-x-2 w-full sm:w-auto">
                 <!-- HTML Editor Toggle -->
                 <button
@@ -89,8 +89,9 @@
                         transition-all border border-gray-700 flex items-center space-x-2 whitespace-nowrap"
                     on:click={toggleHtmlEditor}
                 >
-                    <span>📝</span>
-                    <span class="hidden sm:inline">Edit HTML</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
                 </button>
                 
                 <!-- View Mode Toggle -->
@@ -100,8 +101,15 @@
                         transition-all border border-gray-700 flex items-center space-x-2 whitespace-nowrap"
                     on:click={toggleViewMode}
                 >
-                    <span>{viewMode === 'desktop' ? '📱' : '🖥️'}</span>
-                    <span class="hidden sm:inline">{viewMode === 'desktop' ? 'Mobile' : 'Desktop'}</span>
+                    {#if viewMode === 'desktop'}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                    {:else}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    {/if}
                 </button>
             </div>
         </div>

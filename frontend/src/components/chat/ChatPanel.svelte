@@ -11,10 +11,17 @@
 
     export let chatMessages: ChatMessage[] = [];
     export let isGenerating = false;
+    export let emailType: "newsletter" | "job_application" = "newsletter";
+    
     let quotaInfo = { remaining_chats: 10, max_chats: 10 };
     let showQuotaWarning = false;
     let showChatPanel = true;
-    let showAddContext = false; // Control visibility of context manager
+    let showAddContext = false;
+    let currentMessage = '';
+    let currentSessionId: number | null = null;
+    let sessions: any[] = [];
+    let showSessionList = false;
+    let showContextManager = false;
 
     // Create a local store for contexts
     let contexts = writable<Context[]>([]);
@@ -31,27 +38,62 @@
     let currentMentionStart = -1;
     let currentMentionText = '';
 
+    // Add these variables at the top of the script
+    let dragCounter = 0;
+    let isDragging = false;
+    let fileInput: HTMLInputElement;
+
+    // Add session contexts map
+    let sessionContexts: Map<number, Context[]> = new Map();
+
+    // Function to get current session contexts
+    $: currentContexts = currentSessionId ? (sessionContexts.get(currentSessionId) || []) : [];
+
     const dispatch = createEventDispatcher<{
-        update: { message: string, selectedContexts?: any[] } | { showChatPanel: boolean } | { applyHtml: string } | { notification: { message: string, type: 'error' | 'info' | 'success' } };
+        update: { 
+            message: string;
+            selectedContexts?: any[];
+            emailType?: "newsletter" | "job_application";
+        } | { 
+            showChatPanel: boolean; 
+        } | { 
+            applyHtml: string; 
+        } | { 
+            notification: { 
+                message: string; 
+                type: 'error' | 'info' | 'success'; 
+            }; 
+        };
     }>();
-    let currentMessage = '';
 
-    // Function to set the current message from outside (for templates)
-    export function setPrompt(prompt: string) {
-        currentMessage = prompt;
-        
-        // Focus the textarea and trigger auto-grow
-        setTimeout(() => {
-            const textarea = document.querySelector('textarea');
-            if (textarea) {
-                textarea.focus();
-                const inputEvent = new Event('input');
-                textarea.dispatchEvent(inputEvent);
-            }
-        }, 0);
-    }
+    // Email type specific configurations
+    const emailTypeConfig = {
+        newsletter: {
+            placeholder: "Ask me to create a newsletter...",
+            welcomeMessage: "Hi! I'm your newsletter AI assistant.",
+            description: "I can help you create beautiful newsletters without any technical knowledge.",
+            suggestion: "Ask me anything about creating newsletters or use the templates from the onboarding guide."
+        },
+        job_application: {
+            placeholder: "Ask me to create a job application email...",
+            welcomeMessage: "Hi! I'm your job application AI assistant.",
+            description: "I can help you create compelling job application emails that stand out.",
+            suggestion: "Ask me about creating attention-grabbing job applications or use the templates provided."
+        }
+    };
 
-    onMount(async () => {
+    // Get current config based on email type
+    $: currentConfig = emailTypeConfig[emailType];
+
+    // Add these variables at the top of your script
+    let showNewChatDialog = false;
+    let newChatName = '';
+
+    onMount(() => {
+        loadSessions();
+    });
+
+    async function checkQuota() {
         try {
             const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/quota`);
             if (response.ok) {
@@ -61,98 +103,168 @@
         } catch (error) {
             console.error('Error fetching quota information:', error);
         }
-    });
+    }
 
-    function handleChat() {
+    async function loadSessions() {
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions`);
+            if (response.ok) {
+                sessions = await response.json();
+                
+                // Create default session if no sessions exist
+                if (sessions.length === 0) {
+                    const defaultSession = await createDefaultSession();
+                    if (defaultSession) {
+                        sessions = [defaultSession];
+                        await switchSession(defaultSession.id);
+                    }
+                } else if (!currentSessionId) {
+                    // If there are sessions but none is selected, select the most recent one
+                    await switchSession(sessions[sessions.length - 1].id);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading chat sessions:', error);
+        }
+    }
+
+    async function createDefaultSession() {
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: 'New Chat',
+                    email_type: emailType
+                })
+            });
+            
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (error) {
+            console.error('Error creating default chat session:', error);
+        }
+        return null;
+    }
+
+    async function createNewSession() {
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: `Chat ${sessions.length + 1}`,
+                    email_type: emailType
+                })
+            });
+            
+            if (response.ok) {
+                const newSession = await response.json();
+                sessions = [...sessions, newSession];
+                await switchSession(newSession.id);
+            }
+        } catch (error) {
+            console.error('Error creating chat session:', error);
+        }
+    }
+
+    async function switchSession(sessionId: number) {
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions/${sessionId}/messages`);
+            if (response.ok) {
+                const messages = await response.json();
+                chatMessages = messages;
+                currentSessionId = sessionId;
+                showSessionList = false;
+            }
+        } catch (error) {
+            console.error('Error loading chat messages:', error);
+        }
+    }
+
+    async function deleteSession(sessionId: number) {
+        if (!confirm('Are you sure you want to delete this chat session?')) return;
+        
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions/${sessionId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                sessions = sessions.filter(s => s.id !== sessionId);
+                if (currentSessionId === sessionId) {
+                    currentSessionId = null;
+                    chatMessages = [];
+                }
+            }
+        } catch (error) {
+            console.error('Error deleting chat session:', error);
+        }
+    }
+
+    async function handleChat() {
         if (!currentMessage.trim() || isGenerating) return;
         
-        // Get contexts mentioned in the message
-        const contextContents = getContextContentsForMessage(currentMessage);
+        const userMessage: ChatMessage = {
+            role: 'user',
+            content: currentMessage,
+            timestamp: new Date()
+        };
         
-        // Show notification if context files are being used
-        if (contextContents.length > 0) {
-            const fileNames = contextContents.map(ctx => ctx.name).join(', ');
-            dispatch('update', { 
-                notification: { 
-                    message: `Using context files: ${fileNames}`, 
-                    type: 'info' 
-                } 
+        // Add user message immediately to display
+        chatMessages = [...chatMessages, userMessage];
+        const messageToSend = currentMessage;
+        currentMessage = ''; // Clear input after sending
+        isGenerating = true;
+        
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/ai/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt: messageToSend,
+                    session_id: currentSessionId,
+                    email_type: emailType
+                })
             });
-        }
-        
-        dispatch('update', { 
-            message: currentMessage,
-            selectedContexts: contextContents
-        });
-        currentMessage = '';
-    }
-
-    // Function to find mentioned contexts using @filename syntax
-    function findMentionedContexts(message: string) {
-        const mentionedContexts = [];
-        const contextsValue = get(contexts);
-        
-        // Regular expression to match @filename patterns
-        const mentionRegex = /@([^\s@]+)/g;
-        const mentions = message.match(mentionRegex);
-        
-        if (mentions) {
-            for (const mention of mentions) {
-                const fileName = mention.substring(1); // Remove the @ symbol
-                
-                // Find the context with a matching name (case insensitive)
-                const matchedContext = contextsValue.find(
-                    ctx => ctx.name.toLowerCase() === fileName.toLowerCase()
-                );
-                
-                if (matchedContext) {
-                    mentionedContexts.push({
-                        name: matchedContext.name,
-                        content: matchedContext.content,
-                        type: matchedContext.type
-                    });
-                }
-            }
-        }
-        
-        return mentionedContexts;
-    }
-
-    // Function to get the content of all available contexts for the current message
-    function getContextContentsForMessage(message: string) {
-        // Get all mentioned contexts
-        const mentionedContexts = findMentionedContexts(message);
-        
-        // If no explicit mentions, check if any context file names appear in the message
-        if (mentionedContexts.length === 0) {
-            const contextsValue = get(contexts);
             
-            for (const context of contextsValue) {
-                // If the user mentions the file name in their message, include it
-                if (message.toLowerCase().includes(context.name.toLowerCase())) {
-                    mentionedContexts.push({
-                        name: context.name,
-                        content: context.content,
-                        type: context.type
-                    });
-                    break; // Only include the first matching file to avoid making the prompt too long
-                }
+            if (!response.ok) {
+                throw new Error('Failed to get AI response');
             }
+            
+            const data = await response.json();
+            const assistantMessage: ChatMessage = {
+                role: 'assistant',
+                content: data.response,
+                timestamp: new Date()
+            };
+            
+            // Add assistant message to display
+            chatMessages = [...chatMessages, assistantMessage];
+        } catch (error) {
+            console.error('Error in chat:', error);
+            // Add error message to chat
+            chatMessages = [...chatMessages, {
+                role: 'assistant',
+                content: 'Sorry, I encountered an error. Please try again.',
+                timestamp: new Date()
+            }];
+        } finally {
+            isGenerating = false;
         }
-        
-        return mentionedContexts;
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeydown(event: KeyboardEvent) {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             handleChat();
-            showContextSuggestions = false;
-        } else if (showContextSuggestions) {
-            // Handle navigation in suggestions
-            if (event.key === 'Escape') {
-                showContextSuggestions = false;
-            }
         }
     }
 
@@ -371,288 +483,440 @@
             }
         }, 0);
     }
+
+    // Add these functions after the existing ones
+    function handleDragEnter(event: DragEvent) {
+        event.preventDefault();
+        dragCounter++;
+        isDragging = true;
+    }
+
+    function handleDragLeave(event: DragEvent) {
+        event.preventDefault();
+        dragCounter--;
+        if (dragCounter === 0) {
+            isDragging = false;
+        }
+    }
+
+    function handleDragOver(event: DragEvent) {
+        event.preventDefault();
+    }
+
+    async function handleDrop(event: DragEvent) {
+        event.preventDefault();
+        dragCounter = 0;
+        isDragging = false;
+        
+        const files = event.dataTransfer?.files;
+        if (files) {
+            await handleFiles(Array.from(files));
+        }
+    }
+
+    async function handleFiles(files: File[]) {
+        for (const file of files) {
+            try {
+                const reader = new FileReader();
+                
+                reader.onload = async () => {
+                    const content = file.type.startsWith('image/') 
+                        ? reader.result as string  // Base64 image data
+                        : reader.result as string; // Text content
+                    
+                    const context: Context = {
+                        id: crypto.randomUUID(),
+                        name: file.name,
+                        content: content,
+                        type: file.type.startsWith('image/') ? "image" : "file",
+                        dateAdded: new Date()
+                    };
+                    
+                    if (currentSessionId) {
+                        const sessionContextList = sessionContexts.get(currentSessionId) || [];
+                        sessionContexts.set(currentSessionId, [...sessionContextList, context]);
+                        sessionContexts = new Map(sessionContexts); // Trigger reactivity
+                    }
+                };
+                
+                if (file.type.startsWith('image/')) {
+                    reader.readAsDataURL(file);
+                } else {
+                    reader.readAsText(file);
+                }
+            } catch (error) {
+                console.error('Error processing file:', file.name, error);
+            }
+        }
+    }
+
+    function handleContextClick() {
+        if (fileInput) {
+            fileInput.click();
+        }
+    }
+
+    function handleFileSelect(event: Event) {
+        const input = event.target as HTMLInputElement;
+        if (input.files && input.files.length > 0) {
+            handleFiles(Array.from(input.files));
+        }
+        // Reset input value to allow selecting the same file again
+        input.value = '';
+    }
+
+    // Function to remove context
+    function removeContext(contextId: string) {
+        if (currentSessionId) {
+            const sessionContextList = sessionContexts.get(currentSessionId) || [];
+            sessionContexts.set(
+                currentSessionId, 
+                sessionContextList.filter(ctx => ctx.id !== contextId)
+            );
+            sessionContexts = new Map(sessionContexts); // Trigger reactivity
+        }
+    }
+
+    // Add this function to your script
+    async function handleNewChat() {
+        if (!newChatName.trim()) return;
+
+        try {
+            const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: newChatName,
+                    email_type: emailType
+                })
+            });
+            
+            if (response.ok) {
+                const newSession = await response.json();
+                sessions = [...sessions, newSession];
+                await switchSession(newSession.id);
+                showNewChatDialog = false;
+                newChatName = '';
+            }
+        } catch (error) {
+            console.error('Error creating chat session:', error);
+        }
+    }
 </script>
 
-<div class="h-full border-l border-gray-800 bg-[#2d2d2d] flex flex-col max-h-full overflow-hidden">
+<div 
+    class="flex flex-col h-full bg-[#1e1e1e] text-sm relative"
+    on:dragenter={handleDragEnter}
+    on:dragleave={handleDragLeave}
+    on:dragover={handleDragOver}
+    on:drop={handleDrop}
+    role="region"
+    aria-label="Chat panel with file drop zone"
+>
+    <!-- Hidden file input -->
+    <input
+        type="file"
+        bind:this={fileInput}
+        on:change={handleFileSelect}
+        multiple
+        accept=".txt,.md,.html,.css,.js,.json,.pdf,image/*"
+        class="hidden"
+    />
+
+    <!-- Drag overlay -->
+    {#if isDragging}
+        <div class="absolute inset-0 bg-purple-600/20 border-2 border-dashed border-purple-500 rounded-lg z-50 flex items-center justify-center">
+            <div class="text-white text-lg">Drop files here to add context</div>
+        </div>
+    {/if}
+
     <!-- Chat Header -->
-    <div class="p-3 border-b border-gray-800 flex justify-between items-center flex-shrink-0 bg-gradient-to-r from-gray-800 to-gray-900">
-        <span class="text-base font-medium text-white flex items-center">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+    <div class="flex items-center justify-between px-3 py-2 border-b border-gray-800 bg-[#2d2d2d]">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center">
+                <!-- History Icon with Badge -->
+                <button
+                    on:click={() => showSessionList = !showSessionList}
+                    class="relative p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-white"
+                    title="Chat History"
+                    aria-label="Toggle chat history"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
             </svg>
-            AI Assistant
+                    {#if sessions.length > 0}
+                        <span class="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                            {sessions.length}
+                        </span>
+                    {/if}
+                </button>
+            </div>
+
+            <!-- Current Session Info -->
+            {#if currentSessionId}
+                <div class="flex items-center gap-2 px-2 py-1 bg-gray-800/40 rounded-md">
+                    <span class="text-xs text-gray-400">Current chat:</span>
+                    <span class="text-xs text-white font-medium truncate max-w-[150px]">
+                        {sessions.find(s => s.id === currentSessionId)?.name || 'Untitled Chat'}
         </span>
-        <div class="flex items-center space-x-2">
+                </div>
+            {:else}
+                <span class="text-xs text-gray-500 italic">No active chat session</span>
+            {/if}
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- New Chat Button -->
             <button
-                on:click={() => showAddContext = !showAddContext}
-                class="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-                title="Toggle Context Library"
+                on:click={() => showNewChatDialog = true}
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium transition-colors"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
                 </svg>
+                New Chat
             </button>
+
+            <!-- Context Icon -->
             <button
-                class="lg:hidden p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-                on:click={() => dispatch('update', { showChatPanel: false })}
+                on:click={handleContextClick}
+                class="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-white"
+                title="Add Context Files"
+                aria-label="Toggle context manager"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                 </svg>
             </button>
         </div>
     </div>
 
-    <!-- Context Manager - Collapsible -->
-    {#if showAddContext}
-        <div class="p-3 border-b border-gray-800 flex-shrink-0" transition:slide={{ duration: 200 }}>
-            <ContextManager 
-                bind:selectedContexts 
-                bind:contexts 
-                bind:this={contextManagerComponent}
-                on:insertMention={handleContextMention}
-            />
+    <!-- New Chat Dialog -->
+    {#if showNewChatDialog}
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" transition:fade>
+            <div class="bg-[#2d2d2d] rounded-lg p-4 w-full max-w-md mx-4" transition:slide>
+                <h3 class="text-lg font-medium text-white mb-4">Create New Chat</h3>
+                <form on:submit|preventDefault={handleNewChat} class="space-y-4">
+                    <div>
+                        <label for="chatName" class="block text-sm font-medium text-gray-400 mb-1">Chat Name</label>
+                        <input
+                            type="text"
+                            id="chatName"
+                            bind:value={newChatName}
+                            placeholder="e.g., Newsletter for Q2 2024"
+                            class="w-full bg-[#1a1a1a] border border-gray-700 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+                        />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                class="px-3 py-2 rounded-md text-sm font-medium text-center transition-colors {emailType === 'newsletter' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
+                                on:click={() => emailType = 'newsletter'}
+                            >
+                                Newsletter
+                            </button>
+                            <button
+                                type="button"
+                                class="px-3 py-2 rounded-md text-sm font-medium text-center transition-colors {emailType === 'job_application' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
+                                on:click={() => emailType = 'job_application'}
+                            >
+                                Job Application
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button
+                            type="button"
+                            class="px-4 py-2 rounded-md text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700"
+                            on:click={() => showNewChatDialog = false}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="px-4 py-2 rounded-md text-sm font-medium bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50"
+                            disabled={!newChatName.trim()}
+                        >
+                            Create Chat
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     {/if}
 
-    <!-- Chat Messages - This is the scrollable area -->
-    <div class="flex-1 overflow-y-auto p-3 space-y-4 min-h-0">
-        {#if chatMessages.length === 0}
-            <div class="text-center text-gray-500 text-sm">
-                <p class="mb-2">Hi! I'm your newsletter AI assistant.</p>
-                <p class="mb-2">I can help you create beautiful newsletters without any technical knowledge.</p>
-                <p>Ask me anything about creating newsletters or use the templates from the onboarding guide.</p>
-                <p class="mt-3 text-purple-400">Pro tip: You can reference context files using @filename in your messages!</p>
+    <!-- Session List (if shown) -->
+    {#if showSessionList}
+        <div class="border-b border-gray-800 bg-[#2d2d2d]" transition:slide>
+            <div class="p-3 space-y-2 max-h-64 overflow-y-auto">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-medium text-white">Chat History</h3>
+                    <span class="text-xs text-gray-400">{sessions.length} chats</span>
             </div>
-        {/if}
-        
-        {#each chatMessages as message, i}
-            <div class="flex flex-col space-y-2">
-                <div class="flex items-start space-x-2">
-                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
-                        {message.role === 'user' ? '👤' : '🤖'}
+                
+                {#if sessions.length === 0}
+                    <div class="text-center py-4">
+                        <p class="text-sm text-gray-400">No chat sessions yet</p>
+                        <button
+                            on:click={() => showNewChatDialog = true}
+                            class="mt-2 text-xs text-purple-400 hover:text-purple-300"
+                        >
+                            Create your first chat
+                        </button>
                     </div>
-                    <div class="flex-1 bg-[#1a1a1a] rounded-lg p-4">
-                        {#if message.role === 'assistant' && containsHtml(message.content)}
-                            <div class="prose prose-sm prose-invert max-w-none break-words">
-                                <!-- Display the text part of the message -->
-                                {#if message.content.includes('```')}
-                                    <!-- Extract text before the first code block -->
-                                    {@html message.content.split('```')[0]}
-                                {:else if message.content.includes('<!DOCTYPE html>') || message.content.includes('<html')}
-                                    <!-- Extract text before the HTML content -->
-                                    {@html message.content.split('<!DOCTYPE html>')[0].split('<html')[0]}
-                                {:else if message.content.includes('<body')}
-                                    <!-- Extract text before the body tag -->
-                                    {@html message.content.split('<body')[0]}
                                 {:else}
-                                    <!-- If no clear HTML markers, try to find where HTML-like content starts -->
-                                    {@html message.content.split(/<div|<style|<table|<section/)[0]}
+                    <div class="space-y-1">
+                        {#each sessions as session}
+                            <div 
+                                class="flex items-center gap-2 p-2 rounded-md hover:bg-gray-700/50 transition-colors {currentSessionId === session.id ? 'bg-gray-700/50 ring-1 ring-purple-500/50' : ''}"
+                            >
+                                <div class="flex-1 min-w-0">
+                                    <button
+                                        class="flex items-center gap-2 w-full text-left"
+                                        on:click={() => switchSession(session.id)}
+                                    >
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm text-gray-200 font-medium truncate">
+                                                    {session.name}
+                                                </span>
+                                                {#if session.id === currentSessionId}
+                                                    <span class="text-[10px] text-purple-400 font-medium px-1.5 py-0.5 rounded-full bg-purple-500/10">
+                                                        Current
+                                                    </span>
                                 {/if}
-                                
-                                <!-- Display code block with syntax highlighting -->
-                                {#if extractHtml(message.content)}
-                                    <div class="mt-4 bg-gray-900 rounded-md p-3 text-sm overflow-x-auto">
-                                        <pre><code class="language-html">{extractHtml(message.content)}</code></pre>
+                                            </div>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <span class="text-xs text-gray-500">
+                                                    {session.email_type === 'newsletter' ? 'Newsletter' : 'Job Application'}
+                                                </span>
+                                                <span class="text-gray-600">•</span>
+                                                <span class="text-xs text-gray-500">
+                                                    {new Date(session.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
                                     </div>
-                                    
-                                    <!-- Add Apply to Editor button -->
-                                    <div class="mt-4">
-                                        <button
-                                            on:click={() => applyHtmlToEditor(message.content)}
-                                            class="px-4 py-2 rounded-md text-sm font-medium text-white
-                                                bg-gradient-to-r from-green-600 to-emerald-600 
-                                                hover:from-green-500 hover:to-emerald-500
-                                                transition-all"
-                                        >
-                                            Apply to Editor
                                         </button>
                                     </div>
-                                {/if}
+                                <button
+                                    class="p-1 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    on:click={() => deleteSession(session.id)}
+                                    title="Delete chat"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
                             </div>
-                        {:else}
-                            <div class="prose prose-sm prose-invert max-w-none break-words text-base">
-                                {#if message.role === 'user' && message.content.includes('@')}
-                                    <!-- Highlight @filename mentions in user messages -->
-                                    {@html highlightMentions(message.content)}
-                                {:else}
-                                    {message.content}
-                                {/if}
-                                
-                                <!-- Show context files used for this message if it's a user message -->
-                                {#if message.role === 'user' && message.selectedContexts && message.selectedContexts.length > 0}
-                                    <div class="mt-2 text-xs text-purple-400 italic">
-                                        Using context: {message.selectedContexts.join(', ')}
+                        {/each}
                                     </div>
                                 {/if}
+            </div>
                             </div>
                         {/if}
+
+    <!-- Chat Messages -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        {#each chatMessages as message}
+            <div class="flex flex-col {message.role === 'user' ? 'items-end' : 'items-start'}">
+                {#if message.role === 'user'}
+                    <div class="bg-purple-600/20 text-white rounded-lg px-4 py-2 max-w-[80%] break-words">
+                        {message.content}
                     </div>
+                {:else}
+                    <div class="text-white max-w-[80%] break-words space-y-2">
+                        {message.content}
                 </div>
+                {/if}
             </div>
         {/each}
         
         {#if isGenerating}
-            <div class="flex items-center justify-center text-gray-400">
-                <svg class="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                </svg>
-                Generating...
+            <div class="flex items-center space-x-2 text-gray-400">
+                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                <div class="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
             </div>
         {/if}
     </div>
 
-    <!-- Chat Input -->
-    <div class="p-3 border-t border-gray-800 flex-shrink-0">
-        <div class="flex items-end space-x-2 relative">
-            <div class="flex-1 relative">
-                <textarea
-                    bind:value={currentMessage}
-                    placeholder="Ask me to create a newsletter..."
-                    class="w-full bg-[#1a1a1a] rounded-lg pl-10 pr-4 py-2.5 text-base resize-none min-h-[44px] max-h-32 border border-gray-800 focus:border-purple-500 focus:outline-none transition-colors"
-                    rows="1"
-                    on:input={handleInput}
-                    on:keydown={handleKeyDown}
-                ></textarea>
-                <div class="absolute left-3 bottom-2.5 text-gray-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+    <!-- Input Area -->
+    <div class="border-t border-gray-700/50">
+        <!-- Attached Documents Display -->
+        {#if currentContexts.length > 0}
+            <div class="px-2 py-1.5 flex items-center gap-1.5 overflow-x-auto bg-gray-800/20 border-b border-gray-700/30">
+                <span class="text-[11px] text-gray-500 font-medium whitespace-nowrap">Attached files:</span>
+                <div class="flex items-center gap-1.5 flex-1 overflow-x-auto">
+                    {#each currentContexts as context}
+                        <div class="flex items-center gap-1 bg-gray-700/30 rounded px-1.5 py-0.5 group hover:bg-gray-700/40">
+                            {#if context.type === "image"}
+                                <img src={context.content} alt={context.name} class="w-3 h-3 object-cover rounded" />
+                            {:else}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
                     </svg>
-                </div>
-                
-                {#if $contexts.length > 0}
+                            {/if}
+                            <span class="text-[11px] text-gray-300 truncate max-w-[100px]">{context.name}</span>
                     <button 
-                        class="absolute right-3 bottom-2.5 text-purple-400 hover:text-purple-300 transition-colors"
-                        on:click={() => showAddContext = true}
-                        title="Reference context files"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                on:click={() => removeContext(context.id)}
+                                aria-label="Remove {context.name}"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                         </svg>
                     </button>
-                {/if}
-                
-                <!-- Context Suggestions Dropdown -->
-                {#if showContextSuggestions}
-                    <div 
-                        class="absolute left-0 bottom-full mb-2 w-64 max-h-48 overflow-y-auto bg-[#1a1a1a] border border-gray-800 rounded-md shadow-lg z-10"
-                        transition:fade={{ duration: 150 }}
-                    >
-                        <div class="p-2 text-xs text-gray-400 border-b border-gray-800">
-                            Context files matching "@{currentMentionText}"
                         </div>
-                        <div class="py-1">
-                            {#each contextSuggestions as suggestion}
-                                <button
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-gray-800 transition-colors"
-                                    on:click={() => insertContextMention(suggestion.name)}
-                                >
-                                    {suggestion.name}
-                                </button>
                             {/each}
                         </div>
                     </div>
                 {/if}
-            </div>
-            
+
+        <!-- Input Box -->
+        <div class="p-2">
+            <div class="flex items-center gap-2">
+                <textarea
+                    bind:value={currentMessage}
+                    on:keydown={handleKeydown}
+                    on:input={handleInput}
+                    placeholder={currentConfig.placeholder}
+                    class="flex-1 bg-[#1a1a1a] text-white placeholder-gray-500 rounded px-3 py-1.5 focus:outline-none resize-none text-sm min-h-[36px]"
+                    rows="1"
+                ></textarea>
             <button
                 on:click={handleChat}
-                disabled={!currentMessage.trim() || isGenerating || quotaInfo.remaining_chats <= 0}
-                class="p-2.5 rounded-md text-white
-                    bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500
-                    transition-all disabled:opacity-50 flex items-center justify-center"
-                style="min-width: 44px; min-height: 44px;"
-            >
-                {#if isGenerating}
-                    <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    disabled={isGenerating}
+                    class="p-1.5 rounded bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Send message"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                     </svg>
-                {:else}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                {/if}
             </button>
-        </div>
-        
-        {#if $contexts.length > 0 && !showAddContext}
-            <div class="text-xs text-purple-400 mt-1.5 ml-1">
-                Pro tip: Type @filename to reference a specific context file
             </div>
-        {/if}
+        </div>
     </div>
 </div>
 
 <style>
-    /* Add styles for chat panel scrollbar */
-    .overflow-y-auto {
-        scrollbar-width: thin;
-        scrollbar-color: #4a5568 #1a1a1a;
-    }
-
+    /* Hide scrollbar for Chrome, Safari and Opera */
     .overflow-y-auto::-webkit-scrollbar {
-        width: 6px;
+        display: none;
     }
 
-    .overflow-y-auto::-webkit-scrollbar-track {
-        background: #1a1a1a;
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .overflow-y-auto {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
     }
 
-    .overflow-y-auto::-webkit-scrollbar-thumb {
-        background-color: #4a5568;
-        border-radius: 3px;
-    }
-
-    /* Ensure the chat panel takes full height on mobile */
-    :global(.chat-panel-mobile) {
-        height: 100vh;
-        height: 100dvh;
-        overflow: hidden;
-    }
-
-    /* Code block styling */
-    pre {
-        margin: 0;
-        white-space: pre-wrap;
-        font-size: 0.85rem;
-        line-height: 1.5;
-    }
-    
-    code {
-        font-family: 'Fira Code', 'Courier New', Courier, monospace;
-    }
-    
-    /* HTML syntax highlighting */
-    :global(.language-html) {
-        color: #e2e8f0;
-    }
-    
-    :global(.language-html .tag) {
-        color: #9333ea;
-    }
-    
-    :global(.language-html .attr-name) {
-        color: #3b82f6;
-    }
-    
-    :global(.language-html .attr-value) {
-        color: #10b981;
-    }
-    
-    :global(.language-html .comment) {
-        color: #6b7280;
-        font-style: italic;
-    }
-    
-    /* Improve message styling */
-    .prose {
-        font-size: 0.95rem;
-        line-height: 1.6;
-    }
-    
-    .prose p {
-        margin-bottom: 0.75rem;
+    textarea {
+        min-height: 24px;
+        max-height: 96px;
     }
 </style> 
