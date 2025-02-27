@@ -325,7 +325,7 @@ class AIService:
                 "message": f"An error occurred while generating the AI response: {str(e)}. Please check your API keys in the .env file or try again later."
             }
     
-    def generate_newsletter_html(self, content: str, style_preferences: Optional[str] = None, email_type: str = "newsletter") -> str:
+    def generate_newsletter_html(self, content: str, style_preferences: Optional[str] = None, email_type: str = "professional") -> str:
         # Construct the prompt based on email type
         prompt = f"""Task: Generate an HTML email template for a {email_type}.
 
@@ -359,39 +359,42 @@ Technical requirements:
         html_content = self._optimize_for_spam_filters(html_content, email_type)
         html_content = self._enforce_email_best_practices(html_content, email_type)
         
+        if email_type == "career":
+            # Add job application specific elements
+            html_content = html_content.replace('</body>', f'''
+                <div class="application-footer">
+                    <p>Looking forward to discussing this opportunity further.</p>
+                    <p>Best regards,<br>{self.user_name}</p>
+                </div>
+                </body>
+            ''')
+        
         return html_content
 
     def _optimize_for_spam_filters(self, html: str, email_type: str) -> str:
         # Remove potential spam triggers
-        html = re.sub(r'(?i)urgent|act now|limited time', '', html)
-        html = re.sub(r'[!]{2,}', '!', html)  # Remove multiple exclamation marks
+        html = re.sub(r'(?i)buy now|act now|limited time|special offer|free|discount', '', html)
         
-        if email_type == "job_application":
-            # Remove job application clichés
-            html = re.sub(r'(?i)perfect candidate|ideal fit|perfect fit', 'strong candidate', html)
-            html = re.sub(r'(?i)synergy|think outside the box', '', html)
-        else:
-            # Remove newsletter spam patterns
-            html = re.sub(r'(?i)free|guarantee|winner|prize', '', html)
-            html = re.sub(r'(?i)buy now|order now|click here', 'learn more', html)
+        # Add job application specific elements for career emails
+        if email_type == "career":
+            html = re.sub(r'(?i)salary|compensation|pay|benefits', 'package', html)
         
         return html
 
     def _enforce_email_best_practices(self, html: str, email_type: str) -> str:
         # Ensure required meta tags
-        if '<head>' not in html:
-            html = f'<head><meta charset="UTF-8"></head>{html}'
+        if not re.search(r'<meta[^>]*charset', html, re.I):
+            html = html.replace('<head>', '<head>\n<meta charset="UTF-8">')
         
-        # Add viewport meta tag if missing
-        if 'viewport' not in html:
-            viewport_tag = '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
-            html = html.replace('</head>', f'{viewport_tag}</head>')
-        
-        if email_type == "job_application":
-            # Ensure signature block exists
-            if '<div class="signature"' not in html:
-                signature = '\n<div class="signature">\n<p>Best regards,</p>\n<p>[Your name]</p>\n</div>'
-                html = html.replace('</body>', f'{signature}</body>')
+        # Add job application specific elements for career emails
+        if email_type == "career":
+            html = html.replace('</body>', '''
+                <div class="application-footer">
+                    <p>Looking forward to discussing this opportunity further.</p>
+                    <p>Best regards,</p>
+                </div>
+                </body>
+            ''')
         
         return html
 

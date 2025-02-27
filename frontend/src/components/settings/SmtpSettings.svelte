@@ -22,6 +22,7 @@
             const response = await fetch(`${PUBLIC_API_URL}/detect-smtp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
                 body: JSON.stringify({ email: smtpConfig.email })
             });
 
@@ -68,16 +69,18 @@
             const response = await fetch(`${PUBLIC_API_URL}/test-smtp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
                 body: JSON.stringify(smtpConfig)
             });
 
             if (response.ok) {
                 message = 'SMTP configuration is valid!';
             } else {
-                error = 'Invalid SMTP configuration';
+                const errorData = await response.json();
+                error = `Invalid SMTP configuration: ${errorData.detail}`;
             }
-        } catch (e) {
-            error = 'Failed to test SMTP configuration';
+        } catch (e: any) {
+            error = `Failed to test SMTP configuration: ${e.message}`;
         } finally {
             isTestingConfig = false;
         }

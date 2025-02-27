@@ -15,7 +15,7 @@
         <div class="flex items-center h-14">
             <div class="flex items-center space-x-2">
                 <span class="text-lg md:text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">NoobMail AI</span>
-                <span class="text-xs text-gray-400 hidden sm:inline">Sending Beautiful and Professional Emails Easily</span>
+                <span class="text-xs text-gray-400 hidden sm:inline">Send email with style</span>
             </div>
             <div class="flex-1"></div>
             <!-- Settings Menu -->

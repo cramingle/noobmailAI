@@ -7,10 +7,10 @@
         stepChange: number;
         complete: void;
         useTemplate: string;
-        emailTypeChange: "newsletter" | "job_application";
+        emailTypeChange: "professional" | "career";
     }>();
     export let currentStep = 1;
-    export let emailType: "newsletter" | "job_application" = "newsletter";
+    export let emailType: "professional" | "career" = "professional";
 
     interface Feature {
         title: string;
@@ -46,88 +46,79 @@
         tip?: string;
     }
 
-    const emailTemplates: Record<"newsletter" | "job_application", Template[]> = {
-        newsletter: [
+    const emailTemplates: Record<"professional" | "career", Template[]> = {
+        professional: [
             {
-                title: "Welcome Email",
-                description: "Perfect for new subscribers",
-                prompt: "Create a welcome newsletter with a modern design",
-                type: "newsletter"
+                title: "Scholarship Application",
+                description: "Stand out to admission committees",
+                prompt: "Create a compelling scholarship application email that showcases my achievements and passion",
+                type: "professional"
             },
             {
-                title: "Product Announcement",
-                description: "Showcase your latest offerings",
-                prompt: "Generate a product announcement with images and CTAs",
-                type: "newsletter"
+                title: "Business Proposal",
+                description: "Make a strong first business impression",
+                prompt: "Generate a professional business proposal email to potential clients",
+                type: "professional"
             },
             {
-                title: "Monthly Update",
-                description: "Keep your audience informed",
-                prompt: "Make a monthly update newsletter with sections",
-                type: "newsletter"
+                title: "Creative Portfolio",
+                description: "Showcase your work with style",
+                prompt: "Design an artistic email to present my creative portfolio to potential clients",
+                type: "professional"
             }
         ],
-        job_application: [
+        career: [
             {
-                title: "Entry Level Position",
-                description: "Perfect for recent graduates",
-                prompt: "Create a job application email for an entry-level software developer position",
-                type: "job_application"
+                title: "Dream Job Application",
+                description: "Stand out from other candidates",
+                prompt: "Create a visually impressive job application email that will catch the recruiter's attention",
+                type: "career"
             },
             {
-                title: "Senior Role Application",
-                description: "Highlight extensive experience",
-                prompt: "Generate a senior position application with focus on leadership",
-                type: "job_application"
+                title: "Career Networking",
+                description: "Connect with industry leaders",
+                prompt: "Generate a sophisticated networking email to connect with industry professionals",
+                type: "career"
             },
             {
-                title: "Career Transition",
-                description: "Emphasize transferable skills",
-                prompt: "Create a career change application highlighting relevant experience",
-                type: "job_application"
+                title: "Freelance Pitch",
+                description: "Win clients with style",
+                prompt: "Create an engaging pitch email to potential freelance clients",
+                type: "career"
             }
         ]
     };
 
     const steps: Step[] = [
         {
-            title: "Choose Your Email Type",
-            description: "Select the type of email you want to create",
-            tip: "Choose the option that best fits your needs. You can always change this later."
+            title: "Choose Your Email Purpose",
+            description: "Select the type of impression you want to make",
+            tip: "Every email is an opportunity to stand out - choose the purpose that best fits your goal."
         },
         {
             title: "Welcome to NoobMail AI",
-            description: emailType === "newsletter" 
-                ? "Creating and Sending Beautiful and Professional Newsletters Easily"
-                : "Creating Professional and Impactful Job Application Emails",
+            description: "Creating Stunning First Impression Emails That Get Noticed",
             features: [
                 {
-                    title: emailType === "newsletter" ? "AI Writing Assistant" : "ATS-Optimized Writing",
-                    description: emailType === "newsletter" 
-                        ? "Just describe what you want, and AI creates it"
-                        : "AI ensures your application passes ATS screening"
+                    title: "Style with Purpose",
+                    description: "AI crafts emails that perfectly match your goals"
                 },
                 {
-                    title: emailType === "newsletter" ? "Smart Templates" : "Professional Templates",
-                    description: emailType === "newsletter"
-                        ? "Get inspired by pre-made examples"
-                        : "Industry-tested application formats"
+                    title: "Stand Out Design",
+                    description: "Make unforgettable first impressions"
                 },
                 {
-                    title: emailType === "newsletter" ? "Quick & Easy" : "Stand Out",
-                    description: emailType === "newsletter"
-                        ? "Create professional emails in minutes"
-                        : "Make a strong first impression every time"
+                    title: "Professional Impact",
+                    description: "Command attention with every send"
                 }
-            ],
-            templates: emailTemplates[emailType]
+            ]
         },
         {
             title: "Using Context Files",
-            description: emailType === "newsletter"
+            description: emailType === "professional"
                 ? "Make your emails truly yours"
                 : "Tailor your applications perfectly",
-            steps: emailType === "newsletter" ? [
+            steps: emailType === "professional" ? [
                 "Upload brand guidelines or style documents",
                 "Add previous emails as examples",
                 "Reference files with @filename in your prompts",
@@ -138,10 +129,10 @@
                 "Reference files with @filename in your prompts",
                 "AI matches your qualifications to requirements"
             ],
-            tip: emailType === "newsletter"
+            tip: emailType === "professional"
                 ? "💡 Type @filename in your message to reference a specific context file!"
                 : "💡 Reference your resume with @resume.pdf to highlight relevant experience!",
-            instructions: emailType === "newsletter" ? [
+            instructions: emailType === "professional" ? [
                 {
                     step: "1",
                     action: "Add files to Context Library",
@@ -177,10 +168,10 @@
         },
         {
             title: "Manage Your Recipients",
-            description: emailType === "newsletter"
+            description: emailType === "professional"
                 ? "Keep your contacts organized"
                 : "Track your job applications",
-            instructions: emailType === "newsletter" ? [
+            instructions: emailType === "professional" ? [
                 {
                     step: "1",
                     action: "Click Settings",
@@ -216,7 +207,7 @@
         },
         {
             title: "Ready to Send!",
-            description: emailType === "newsletter"
+            description: emailType === "professional"
                 ? "Final setup for your email campaign"
                 : "Final setup for your job application",
             providers: [
@@ -233,7 +224,7 @@
                     setup: "Your own email server"
                 }
             ],
-            tip: emailType === "newsletter"
+            tip: emailType === "professional"
                 ? "Need help? Click the AI Setup Helper in SMTP settings!"
                 : "Pro tip: Set up email tracking to monitor when your application is viewed!"
         }
@@ -259,21 +250,15 @@
     // Track if user has selected an email type
     let hasSelectedType = false;
 
-    function handleEmailTypeChange(newType: "newsletter" | "job_application") {
+    function handleEmailTypeChange(newType: "professional" | "career") {
         emailType = newType;
         hasSelectedType = true;
         dispatch('emailTypeChange', newType);
-        // Automatically move to next step when type is selected
         handleNext();
     }
 
-    $: welcomeTitle = emailType === "newsletter" 
-        ? "Welcome to Newsletter AI!" 
-        : "Welcome to Job Application AI!";
-
-    $: welcomeDescription = emailType === "newsletter"
-        ? "Your AI-powered newsletter assistant"
-        : "Your AI-powered job application assistant";
+    $: welcomeTitle = "Welcome to StyleMail AI!";
+    $: welcomeDescription = "Your AI-powered email styling assistant";
 </script>
 
 <div class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4" transition:slide>
@@ -302,21 +287,21 @@
                     <div class="max-w-2xl mx-auto">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <button
-                                class="bg-[#2d2d2d]/50 rounded-lg p-6 text-left hover:bg-[#2d2d2d] transition-all border-2 {emailType === 'newsletter' ? 'border-purple-500' : 'border-transparent'}"
-                                on:click={() => handleEmailTypeChange('newsletter')}
+                                class="bg-[#2d2d2d]/50 rounded-lg p-6 text-left hover:bg-[#2d2d2d] transition-all border-2 {emailType === 'professional' ? 'border-purple-500' : 'border-transparent'}"
+                                on:click={() => handleEmailTypeChange('professional')}
                             >
-                                <div class="text-2xl mb-2">📰</div>
-                                <h4 class="text-lg font-medium text-white mb-2">Newsletter</h4>
-                                <p class="text-gray-400 text-sm">Create engaging newsletters for your audience. Perfect for updates, announcements, and keeping your subscribers informed.</p>
+                                <div class="text-2xl mb-2">✨</div>
+                                <h4 class="text-lg font-medium text-white mb-2">Professional & Academic</h4>
+                                <p class="text-gray-400 text-sm">Create stunning emails for scholarship applications, business proposals, and professional communications that demand attention.</p>
                             </button>
 
                             <button
-                                class="bg-[#2d2d2d]/50 rounded-lg p-6 text-left hover:bg-[#2d2d2d] transition-all border-2 {emailType === 'job_application' ? 'border-purple-500' : 'border-transparent'}"
-                                on:click={() => handleEmailTypeChange('job_application')}
+                                class="bg-[#2d2d2d]/50 rounded-lg p-6 text-left hover:bg-[#2d2d2d] transition-all border-2 {emailType === 'career' ? 'border-purple-500' : 'border-transparent'}"
+                                on:click={() => handleEmailTypeChange('career')}
                             >
                                 <div class="text-2xl mb-2">💼</div>
-                                <h4 class="text-lg font-medium text-white mb-2">Job Application</h4>
-                                <p class="text-gray-400 text-sm">Create professional job application emails that stand out. Perfect for making a strong first impression with potential employers.</p>
+                                <h4 class="text-lg font-medium text-white mb-2">Career & Business</h4>
+                                <p class="text-gray-400 text-sm">Stand out with professionally styled emails for job applications, networking, and client communications that make lasting impressions.</p>
                             </button>
                         </div>
                     </div>
@@ -412,7 +397,7 @@
                         <div class="mt-4 bg-[#1a1a1a] rounded-lg p-4">
                             <div class="text-sm text-gray-400 mb-2">Example prompt with context:</div>
                             <div class="bg-[#2d2d2d] p-3 rounded text-gray-300 text-sm">
-                                {#if emailType === "newsletter"}
+                                {#if emailType === "professional"}
                                     "Create a newsletter that matches the style in <span class="text-purple-400 font-semibold">@brand-guide.pdf</span> and includes information about our new product launch"
                                 {:else}
                                     "Create a job application email using my qualifications from <span class="text-purple-400 font-semibold">@resume.pdf</span> matching the requirements in <span class="text-purple-400 font-semibold">@job-description.pdf</span>"
@@ -449,17 +434,17 @@
                         <div class="text-center mb-4">
                             <div class="text-4xl mb-2">👥</div>
                             <div class="text-sm text-gray-400">
-                                {emailType === "newsletter"
+                                {emailType === "professional"
                                     ? "Organize your contacts into groups for targeted sending"
                                     : "Track your applications and hiring contacts"}
                             </div>
                         </div>
                         <div class="bg-[#2d2d2d] rounded p-3 text-sm">
                             <div class="font-medium text-white mb-1">
-                                {emailType === "newsletter" ? "Example Groups" : "Application Tracking"}
+                                {emailType === "professional" ? "Example Groups" : "Application Tracking"}
                             </div>
                             <ul class="text-gray-400 space-y-1">
-                                {#if emailType === "newsletter"}
+                                {#if emailType === "professional"}
                                     <li>• All Subscribers</li>
                                     <li>• Premium Members</li>
                                     <li>• New Customers</li>
@@ -501,13 +486,13 @@
                         <div class="text-center mb-4">
                             <div class="text-4xl mb-2">🚀</div>
                             <div class="text-sm text-gray-400">
-                                {emailType === "newsletter"
+                                {emailType === "professional"
                                     ? "Ready to send your beautiful newsletter!"
                                     : "Ready to send your compelling job application!"}
                             </div>
                         </div>
                         <div class="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg p-3 text-center text-white font-medium">
-                            {emailType === "newsletter" ? "Send Newsletter" : "Send Application"}
+                            {emailType === "professional" ? "Send Professional Email" : "Send Career Email"}
                         </div>
                     </div>
                 </div>

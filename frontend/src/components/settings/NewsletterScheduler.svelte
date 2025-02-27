@@ -39,12 +39,20 @@
     
     async function loadSchedules() {
         try {
-            const response = await fetch(`${PUBLIC_API_URL}/scheduled-newsletters`);
-            if (!response.ok) throw new Error('Failed to load schedules');
-            schedules = await response.json();
+            const response = await fetch(`${PUBLIC_API_URL}/scheduled-newsletters`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                mode: 'cors'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load scheduled newsletters');
+            }
+
+            const data = await response.json();
+            schedules = data;
         } catch (error) {
-            errorMessage = 'Failed to load newsletter schedules';
-            console.error(error);
+            console.error('Error loading scheduled newsletters:', error);
         } finally {
             isLoading = false;
         }
@@ -55,27 +63,27 @@
             const response = await fetch(`${PUBLIC_API_URL}/schedule-newsletter`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
                 body: JSON.stringify({
-                    ...newSchedule,
-                    start_date: new Date(newSchedule.start_date).toISOString()
+                    name: newSchedule.name,
+                    description: newSchedule.description,
+                    template_content: newSchedule.template_content,
+                    recipient_group: newSchedule.recipient_group,
+                    frequency: newSchedule.frequency,
+                    start_date: newSchedule.start_date
                 })
             });
             
-            if (!response.ok) throw new Error('Failed to create schedule');
-            
-            await loadSchedules();
+            if (!response.ok) {
+                throw new Error('Failed to schedule newsletter');
+            }
+
+            const data = await response.json();
+            schedules = [...schedules, data];
             showAddForm = false;
-            newSchedule = {
-                name: '',
-                description: '',
-                template_content: '',
-                recipient_group: '',
-                frequency: 'monthly',
-                start_date: new Date().toISOString().split('T')[0]
-            };
+            resetNewSchedule();
         } catch (error) {
-            errorMessage = 'Failed to create newsletter schedule';
-            console.error(error);
+            console.error('Error scheduling newsletter:', error);
         }
     }
     
@@ -84,7 +92,9 @@
         
         try {
             const response = await fetch(`${PUBLIC_API_URL}/schedule-newsletter/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                mode: 'cors'
             });
             
             if (!response.ok) throw new Error('Failed to delete schedule');
@@ -94,6 +104,17 @@
             errorMessage = 'Failed to delete newsletter schedule';
             console.error(error);
         }
+    }
+
+    function resetNewSchedule() {
+        newSchedule = {
+            name: '',
+            description: '',
+            template_content: '',
+            recipient_group: '',
+            frequency: 'monthly',
+            start_date: new Date().toISOString().split('T')[0]
+        };
     }
 </script>
 

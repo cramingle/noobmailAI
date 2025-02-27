@@ -10,7 +10,7 @@ class ChatSession(Base):
     
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
-    email_type = Column(String(50), default='newsletter')  # 'newsletter' or 'job_application'
+    email_type = Column(String(50), default='professional')  # 'professional' or 'career'
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")

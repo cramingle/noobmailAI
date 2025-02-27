@@ -14,7 +14,7 @@
     import NewsletterScheduler from '../../components/settings/NewsletterScheduler.svelte';
 
     // Update page title
-    const title = "NoobMail AI - Sending Beautiful and Professional Emails Easily";
+    const title = "NoobMail AI - Send email with style";
     const description = "Create and send beautiful newsletters without any technical knowledge. AI-powered newsletter editor for beginners.";
 
     let onboardingStep = 1;
@@ -23,7 +23,7 @@
     let chatPanelComponent: ChatPanel;
 
     // Email type state
-    let emailType: "newsletter" | "job_application" = "newsletter";
+    let emailType: "professional" | "career" = "professional";
 
     // New state for sidebar navigation
     let activeSidebarTab: 'recipients' | 'scheduler' | 'smtp' = 'recipients';
@@ -172,6 +172,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                mode: 'cors',
                 body: JSON.stringify({
                     prompt: userMessage.content,
                     context: chatMessages.map(msg => ({
@@ -223,7 +224,7 @@
     }
 
     // Handle email type change from OnboardingGuide
-    function handleEmailTypeChange(event: CustomEvent<"newsletter" | "job_application">) {
+    function handleEmailTypeChange(event: CustomEvent<"professional" | "career">) {
         emailType = event.detail;
     }
 </script>

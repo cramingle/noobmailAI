@@ -7,7 +7,7 @@
     import { writable } from 'svelte/store';
 
     // SEO metadata
-    const title = "NoobMail AI - Sending Beautiful and Professional Emails Easily";
+    const title = "NoobMail AI - Send email with style";
     const description = "Create and send beautiful newsletters without any technical knowledge. AI-powered newsletter editor for beginners.";
     
     // JSON-LD structured data
@@ -31,11 +31,11 @@
     };
 
     // Add email type state
-    let emailType: "newsletter" | "job_application" = "newsletter";
+    let emailType: "professional" | "career" = "professional";
     
     // Add email type toggle function
     function toggleEmailType() {
-        emailType = emailType === "newsletter" ? "job_application" : "newsletter";
+        emailType = emailType === "professional" ? "career" : "professional";
     }
 
     onMount(() => {
@@ -65,7 +65,7 @@
             on:click={toggleEmailType}
             class="px-4 py-2 rounded-md text-sm font-medium bg-purple-600 hover:bg-purple-500 transition-colors"
         >
-            Switch to {emailType === "newsletter" ? "Job Applications" : "Newsletters"}
+            Switch to {emailType === "professional" ? "Career & Business" : "Professional & Academic"}
         </button>
     </div>
 

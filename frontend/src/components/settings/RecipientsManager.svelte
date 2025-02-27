@@ -15,6 +15,9 @@
     let showAddRecipientForm = false;
     let isSending = false;
     let showTooltip = false;
+    let error = '';
+    let success = '';
+    let testRecipient: Recipient = { name: '', email: '', organization: '' };
 
     function addRecipient() {
         if (newRecipient.name && newRecipient.email) {
@@ -70,6 +73,46 @@
             }
         } catch (error) {
             console.error('Error sending email:', error);
+        } finally {
+            isSending = false;
+        }
+    }
+
+    // Function to send test email
+    async function sendTestEmail() {
+        isSending = true;
+        error = '';
+        success = '';
+
+        try {
+            const response = await fetch(`${PUBLIC_API_URL}/send-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
+                body: JSON.stringify({
+                    content: htmlContent,
+                    recipients: [
+                        {
+                            name: testRecipient.name,
+                            email: testRecipient.email,
+                            organization: testRecipient.organization || undefined
+                        }
+                    ],
+                    smtp: smtpConfig,
+                    use_ai: false
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                success = 'Test email sent successfully!';
+                testRecipient = { name: '', email: '', organization: '' };
+            } else {
+                error = data.detail || 'Failed to send test email';
+            }
+        } catch (e: any) {
+            error = e.message || 'Failed to send test email';
         } finally {
             isSending = false;
         }

@@ -140,12 +140,14 @@
             </div>
         {:else}
             <!-- Preview Frame -->
-            <div class="flex-1 bg-white overflow-hidden">
-                <iframe
-                    bind:this={previewFrame}
-                    title="Newsletter Preview"
-                    class="w-full h-full {viewMode === 'mobile' ? 'max-w-sm mx-auto' : ''}"
-                ></iframe>
+            <div class="flex-1 bg-white overflow-hidden {viewMode === 'mobile' ? 'flex justify-center' : ''}">
+                <div class="{viewMode === 'mobile' ? 'w-[375px] h-full border-x border-gray-200 bg-gray-50' : 'w-full h-full'}">
+                    <iframe
+                        bind:this={previewFrame}
+                        title="Newsletter Preview"
+                        class="w-full h-full"
+                    ></iframe>
+                </div>
             </div>
         {/if}
     </div>
@@ -159,8 +161,8 @@
     }
 
     /* Add smooth transition for view mode changes */
-    iframe {
-        transition: max-width 0.3s ease;
+    .flex-1 > div {
+        transition: width 0.3s ease;
     }
 
     /* Ensure the preview takes full height */

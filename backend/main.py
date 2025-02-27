@@ -31,9 +31,11 @@ ALLOWED_ORIGINS = os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,  # Allow both dev and production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["Content-Type"],
+    max_age=3600,
 )
 
 # Models
@@ -171,14 +173,10 @@ async def chat_with_ai(request: ChatRequest):
         context = request.context or []
         
         # Create a custom system prompt that emphasizes the importance of context files
-        custom_system_prompt = """You are an AI assistant specialized in helping users create newsletters and email content.
-Your goal is to provide helpful, accurate, and creative responses to user queries about newsletter creation.
-
-IMPORTANT: USER CONTEXT FILES
-The user may provide context files that contain important information. These files are crucial for understanding
-the user's needs and generating appropriate responses. Pay special attention to any context files mentioned
-with @filename syntax or by name in the user's message.
-"""
+        custom_system_prompt = """You are an AI assistant specialized in helping users create professional and career-focused emails.
+        Your goal is to provide helpful, accurate, and creative responses to user queries about email creation.
+        When asked to generate email content, provide well-structured HTML that can be directly used in an email campaign.
+        Focus on creating content that is visually appealing, mobile-responsive, and follows email best practices."""
         
         # Add context files to the system prompt for better understanding
         if request.contextFiles:
