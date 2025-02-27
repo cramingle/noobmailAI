@@ -13,6 +13,8 @@
     let message = '';
     let error = '';
 
+    const providers: EmailProvider[] = ['gmail', 'outlook', 'yahoo'];
+
     // Function to detect SMTP settings
     async function detectSmtpSettings() {
         isDetectingConfig = true;
@@ -44,27 +46,19 @@
             gmail: {
                 server: 'smtp.gmail.com',
                 port: '587',
-                instructions: `For Gmail:
-1. Enable 2-Step Verification
-2. Generate an App Password
-3. Use your Gmail address and the App Password`
+                instructions: `For Gmail:\n1. Enable 2-Step Verification\n2. Generate an App Password\n3. Use your Gmail address and the App Password`
             },
             outlook: {
                 server: 'smtp.office365.com',
                 port: '587',
-                instructions: `For Outlook:
-1. Use your full email address
-2. Use your regular password or create an App Password if using 2FA`
+                instructions: `For Outlook:\n1. Use your full email address\n2. Use your regular password or create an App Password if using 2FA`
             },
             yahoo: {
                 server: 'smtp.mail.yahoo.com',
                 port: '587',
-                instructions: `For Yahoo:
-1. Enable 2-Step Verification
-2. Generate an App Password
-3. Use your Yahoo address and the App Password`
+                instructions: `For Yahoo:\n1. Enable 2-Step Verification\n2. Generate an App Password\n3. Use your Yahoo address and the App Password`
             }
-        };
+        } as const;
         return help[provider];
     }
 
@@ -109,11 +103,11 @@
         <div class="bg-[#1a1a1a] rounded-lg p-2 border border-gray-800 text-xs" transition:slide>
             <p class="mb-2">Select your email provider:</p>
             <div class="grid grid-cols-3 gap-1">
-                {#each ['gmail', 'outlook', 'yahoo'] as provider}
+                {#each providers as provider}
                     <button
                         class="p-1 rounded bg-[#2d2d2d] hover:bg-gray-700 transition-colors capitalize text-xs"
                         on:click={() => {
-                            const help = getSmtpHelp(provider as EmailProvider);
+                            const help = getSmtpHelp(provider);
                             if (help) {
                                 smtpConfig.server = help.server;
                                 smtpConfig.port = help.port;

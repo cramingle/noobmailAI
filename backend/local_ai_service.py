@@ -1,19 +1,51 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException # type: ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from pydantic import BaseModel # type: ignore
 from typing import List, Optional, Dict, Any
 import requests
 import json
 import re
 from datetime import datetime
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker # type: ignore
 from models import ChatSession, ChatMessage, engine
 import logging
-import uvicorn
+import uvicorn # type: ignore
+import os
+from dotenv import load_dotenv # type: ignore
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Ollama API Configuration
+OLLAMA_API = os.getenv('OLLAMA_API_URL', 'http://localhost:11434/api/chat')
+DEFAULT_SYSTEM_PROMPT = """You are an expert email writer and designer. When asked to create emails, ALWAYS respond with properly formatted HTML that includes modern, responsive design and styling.
+
+Key requirements:
+1. ALWAYS include complete HTML structure with <!DOCTYPE html>, <head>, and <body> tags
+2. ALWAYS include embedded CSS in <style> tag with modern design principles
+3. Use responsive design with media queries for mobile compatibility
+4. Include professional color schemes and typography
+5. Ensure proper spacing and layout using modern CSS
+6. Add engaging visual hierarchy and white space
+
+Example structure:
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* Modern, responsive CSS here */
+    </style>
+</head>
+<body>
+    /* Well-structured content here */
+</body>
+</html>
+
+Remember: Every email response should be beautifully designed and ready to use."""
 
 app = FastAPI()
 
@@ -50,113 +82,43 @@ class NewsletterRequest(BaseModel):
     content_details: Dict[str, Any]
     style_preferences: Optional[Dict[str, Any]] = None
 
-OLLAMA_API = "http://localhost:11434/api/chat"
-
-# Default system prompt for newsletter creation
-DEFAULT_SYSTEM_PROMPT = """You are Boon, the AI assistant for NoobMail. Your name "Boon" represents the opposite of "noob" because you help users become email experts. You are friendly, professional, and focused specifically on helping users create amazing emails and newsletters.
-
-YOUR IDENTITY:
-1. You are Boon, NoobMail's dedicated email assistant
-2. Your purpose is to help users create professional and effective emails
-3. You focus exclusively on email-related tasks and questions
-4. You don't handle programming or technical questions outside of email creation
-5. You're proud to help users transform from email "noobs" to "boons"
-
-COMMUNICATION STYLE:
-1. Warm and encouraging
-2. Professional but approachable
-3. Focus on email best practices
-4. Guide users step by step
-5. Use clear, non-technical language
-6. Always stay focused on email-related topics
-
-WHEN HELPING WITH EMAILS:
-
-FOR NEWSLETTERS:
-1. First, ask about:
-   - The main topic or purpose
-   - Target audience
-   - Key message they want to convey
-   - Any specific preferences for style
-
-2. Then guide them through content:
-   - Suggest engaging subject lines
-   - Help structure the main message
-   - Recommend layout ideas
-   - Offer example templates
-
-3. Only after understanding their needs, create:
-   - Professional, clean design
-   - Mobile-friendly layout
-   - Spam-safe content
-   - Easy-to-read structure
-
-FOR JOB APPLICATIONS:
-1. First, ask about:
-   - The specific role
-   - Company details
-   - Their key qualifications
-   - Any specific requirements
-
-2. Then help them:
-   - Craft attention-grabbing openings
-   - Highlight relevant experience
-   - Structure their qualifications
-   - Create compelling call-to-action
-
-3. Only after understanding their needs, create:
-   - Professional formatting
-   - ATS-friendly structure
-   - Clear contact information
-   - Impactful closing
-
-TECHNICAL REQUIREMENTS (Handle these automatically without technical discussion):
-1. Email Best Practices:
-   - Clean HTML structure
-   - Mobile responsiveness
-   - Spam filter compliance
-   - Email client compatibility
-
-2. Content Optimization:
-   - Professional formatting
-   - Proper spacing
-   - Clear hierarchy
-   - Balanced layout
-
-Remember: Users don't need to know about HTML, CSS, or technical details. Focus on their content and goals, and handle the technical implementation invisibly. Stay focused on email creation and avoid discussing technical implementation details. If users ask about programming or non-email topics, politely remind them that you're specialized in email creation and guide them back to email-related discussions.
-
-When users ask for help:
-1. Start with questions about their needs
-2. Offer suggestions and examples
-3. Guide them through choices
-4. Generate the email only after understanding their requirements
-5. Always explain next steps clearly
-
-Keep the conversation natural and focused on their goals, not the technical implementation."""
-
 def validate_email_request(prompt: str, email_type: str = "newsletter") -> bool:
     """Validate if the request is related to email creation."""
-    newsletter_keywords = [
-        'newsletter', 'email', 'template', 'campaign',
-        'header', 'footer', 'design', 'layout',
-        'responsive', 'html', 'subject line', 'edm',
-        'marketing email', 'email blast', 'mailing list'
-    ]
+    email_keywords = {
+        "newsletter": [
+            'newsletter', 'email', 'template', 'campaign',
+            'header', 'footer', 'design', 'layout',
+            'responsive', 'html', 'subject line', 'edm',
+            'marketing email', 'email blast', 'mailing list'
+        ],
+        "job_application": [
+            'job application', 'cover letter', 'job email',
+            'application email', 'resume', 'cv', 'hiring manager',
+            'recruiter', 'position', 'job opening', 'vacancy',
+            'career', 'opportunity', 'employment', 'apply'
+        ],
+        "scholarship": [
+            'scholarship', 'academic', 'application letter',
+            'statement of purpose', 'motivation letter',
+            'research proposal', 'grant application',
+            'funding request', 'academic achievement',
+            'educational background', 'study plan'
+        ],
+        "business": [
+            'business proposal', 'partnership', 'collaboration',
+            'meeting request', 'follow up', 'quotation',
+            'professional service', 'business opportunity',
+            'contract', 'agreement', 'business inquiry'
+        ]
+    }
     
-    job_application_keywords = [
-        'job application', 'cover letter', 'job email',
-        'application email', 'resume', 'cv', 'hiring manager',
-        'recruiter', 'position', 'job opening', 'vacancy',
-        'career', 'opportunity', 'employment', 'apply'
-    ]
+    # If email type is specified, check those keywords
+    if email_type in email_keywords:
+        return any(keyword in prompt.lower() for keyword in email_keywords[email_type])
     
-    if email_type == "newsletter":
-        return any(keyword in prompt.lower() for keyword in newsletter_keywords)
-    elif email_type == "job_application":
-        return any(keyword in prompt.lower() for keyword in job_application_keywords)
-    else:
-        # If type not specified, check for either
-        return any(keyword in prompt.lower() for keyword in newsletter_keywords + job_application_keywords)
+    # If type not specified or unknown, check all keywords
+    all_keywords = [word for keywords in email_keywords.values() for word in keywords]
+    return any(keyword in prompt.lower() for keyword in all_keywords)
 
 def enforce_anti_spam_elements(html: str, email_type: str = "newsletter") -> str:
     """Ensure HTML includes all necessary anti-spam elements based on email type."""
@@ -229,6 +191,61 @@ def handle_ollama_error(error_text: str) -> str:
     else:
         return "I encountered an unexpected issue. Could you rephrase your request or try again?"
 
+def format_chat_response(response_text: str, email_type: str = "newsletter") -> Dict[str, Any]:
+    """Format the chat response, handling HTML content specially."""
+    # Check if the response contains HTML-like content
+    has_html = any(marker in response_text.lower() for marker in [
+        '<!doctype html>', '<html', '<body', '<div', '<p>', '<h1>', '<style'
+    ])
+    
+    # If it's not HTML content, return as a simple message
+    if not has_html:
+        return {
+            "type": "text",
+            "content": response_text,
+            "status": "success"
+        }
+
+    # If response doesn't include HTML structure, wrap it in a default template
+    if not ('<!DOCTYPE html>' in response_text or '<html' in response_text):
+        default_style = """
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; }
+            h1, h2 { color: #333; }
+            p { margin-bottom: 1em; color: #666; }
+            .container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            @media (max-width: 600px) {
+                body { padding: 10px; }
+                .container { padding: 15px; }
+            }
+        </style>
+        """
+        response_text = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            {default_style}
+        </head>
+        <body>
+            <div class="container">
+                {response_text}
+            </div>
+        </body>
+        </html>
+        """
+    
+    # Return a structured response for HTML content
+    return {
+        "type": "email_template",
+        "content": {
+            "message": "∘",
+            "html": response_text
+        },
+        "status": "success"
+    }
+
 @app.post("/chat-sessions")
 async def create_chat_session(session_data: ChatSessionCreate):
     """Create a new chat session"""
@@ -300,34 +317,12 @@ async def delete_chat_session(session_id: int):
 async def chat_with_ai(request: ChatRequest):
     """Handle chat requests and maintain conversation context."""
     
-    # Get database session
     db = SessionLocal()
     try:
-        # Determine if this is a request for HTML generation
-        is_html_request = validate_email_request(request.prompt, request.email_type)
-        
-        # Format the prompt based on the type of request
         formatted_prompt = request.prompt
-        if is_html_request:
-            formatted_prompt = f"""Please create an HTML email template for a {request.email_type}.
-Requirements:
-- Professional structure
-- Clean HTML format
-- Include subject line, greeting, body, and signature
-- Focus on: {request.prompt}
-
-Technical requirements:
-- Use semantic HTML5
-- Include proper meta tags
-- Ensure mobile responsiveness
-- Keep styling minimal and professional
-
-Please output the HTML template:"""
-        
-        # Get conversation context if session exists
         conversation_context = []
+        
         if request.session_id:
-            # Get last 10 messages from the session
             messages = (
                 db.query(ChatMessage)
                 .filter(ChatMessage.session_id == request.session_id)
@@ -335,88 +330,71 @@ Please output the HTML template:"""
                 .limit(10)
                 .all()
             )
-            conversation_context = [
-                {"role": msg.role, "content": msg.content}
-                for msg in reversed(messages)
-            ]
-        
-        # Add any provided context
-        if request.context:
-            conversation_context.extend(request.context)
+            conversation_context = [{"role": msg.role, "content": msg.content} for msg in reversed(messages)]
         
         try:
-            # Call Ollama API with conversation context
+            system_prompt = request.system_prompt or DEFAULT_SYSTEM_PROMPT
+            
             response = requests.post(
                 OLLAMA_API,
                 json={
                     "model": "deepseek-coder:6.7b",
-                    "prompt": request.prompt,
-                    "stream": True,
-                    "context": conversation_context,
-                    "system": request.system_prompt or DEFAULT_SYSTEM_PROMPT
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        *conversation_context,
+                        {"role": "user", "content": formatted_prompt}
+                    ],
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "num_ctx": 4096
+                    }
                 }
             )
             
             if response.status_code != 200:
                 error_message = handle_ollama_error(response.text)
-                print(f"Ollama API error: {response.text}")
+                logger.error(f"Ollama API error: {response.text}")
                 return {
                     "response": error_message,
                     "status": "error"
                 }
             
-            # Parse the streaming response
-            response_text = ""
-            for line in response.text.split('\n'):
-                if line.strip():
-                    try:
-                        chunk = json.loads(line)
-                        if "message" in chunk and "content" in chunk["message"]:
-                            response_text += chunk["message"]["content"]
-                    except json.JSONDecodeError:
-                        continue
+            response_data = response.json()
+            response_text = response_data.get("message", {}).get("content", "").strip()
             
-            response_text = response_text.strip()
+            if not response_text:
+                return {
+                    "response": "I apologize, but I didn't receive a proper response. Please try again.",
+                    "status": "error"
+                }
             
-            # If response contains HTML and this was a HTML request, optimize it
-            if is_html_request and ('<html' in response_text or '<body' in response_text):
-                response_text = optimize_for_spam_filters(response_text)
-                response_text = enforce_anti_spam_elements(response_text, request.email_type)
+            # Format the response
+            formatted_response = format_chat_response(response_text, request.email_type)
             
-            # Save messages to database if session exists
+            # Save to database if we have a session
             if request.session_id:
-                # Save user message
-                user_message = ChatMessage(
-                    session_id=request.session_id,
-                    role="user",
-                    content=request.prompt
+                # Save the display message, not the raw HTML
+                display_content = (
+                    formatted_response["content"]["message"] 
+                    if formatted_response["type"] == "email_template"
+                    else formatted_response["content"]
                 )
-                db.add(user_message)
                 
-                # Save assistant message
-                assistant_message = ChatMessage(
+                new_message = ChatMessage(
                     session_id=request.session_id,
                     role="assistant",
-                    content=response_text
+                    content=display_content,
                 )
-                db.add(assistant_message)
+                
+                db.add(new_message)
                 db.commit()
             
-            return {
-                "response": response_text,
-                "status": "success"
-            }
-            
-        except requests.exceptions.RequestException as e:
-            print(f"Request error: {str(e)}")
-            return {
-                "response": "I'm having trouble connecting to my language model. Please try again in a moment.",
-                "status": "error"
-            }
+            return formatted_response
         except Exception as e:
-            print(f"Unexpected error: {str(e)}")
+            logger.error(f"Error in chat_with_ai: {str(e)}")
             return {
-                "response": "An unexpected error occurred. Please try again.",
+                "response": "An error occurred while processing your request. Please try again.",
                 "status": "error"
             }
     finally:
@@ -425,19 +403,23 @@ Please output the HTML template:"""
 @app.post("/ai/generate-newsletter")
 async def generate_newsletter(request: NewsletterRequest):
     try:
+        prompt = f"""Generate an HTML newsletter about {request.topic}.
+Content details: {json.dumps(request.content_details)}
+Style preferences: {json.dumps(request.style_preferences) if request.style_preferences else 'None'}
+
+Please generate a complete, well-formatted HTML newsletter that can be used directly."""
+
         response = requests.post(
             OLLAMA_API,
             json={
                 "model": "deepseek-coder:6.7b",
-                "messages": [
-                    {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
-                    {"role": "user", "content": f"""Generate an HTML newsletter about {request.topic}.
-Content details: {json.dumps(request.content_details)}
-Style preferences: {json.dumps(request.style_preferences) if request.style_preferences else 'None'}
-
-Please generate a complete, well-formatted HTML newsletter that can be used directly."""}
-                ],
-                "stream": False
+                "system": DEFAULT_SYSTEM_PROMPT,
+                "prompt": prompt,
+                "format": "json",
+                "options": {
+                    "temperature": 0.7,
+                    "num_ctx": 4096
+                }
             }
         )
         
@@ -445,19 +427,14 @@ Please generate a complete, well-formatted HTML newsletter that can be used dire
             print(f"Ollama API error: {response.text}")
             raise HTTPException(status_code=500, detail=f"Failed to generate newsletter: {response.text}")
         
-        # Parse the streaming response
-        newsletter_html = ""
-        for line in response.text.split('\n'):
-            if line.strip():
-                try:
-                    chunk = json.loads(line)
-                    if "message" in chunk and "content" in chunk["message"]:
-                        newsletter_html += chunk["message"]["content"]
-                except json.JSONDecodeError:
-                    continue
+        response_data = response.json()
+        newsletter_html = response_data.get("response", "").strip()
+        
+        if not newsletter_html:
+            raise HTTPException(status_code=500, detail="Failed to generate newsletter content")
         
         return {
-            "html": newsletter_html.strip(),
+            "html": newsletter_html,
             "status": "success"
         }
     except Exception as e:

@@ -1,7 +1,7 @@
 <!-- ChatPanel.svelte -->
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import type { ChatMessage } from '$lib/types';
+    import type { ChatMessage, EmailTemplate, EmailContent, TextResponse } from '$lib/types';
     import { fade, slide } from 'svelte/transition';
     import ContextManager from './ContextManager.svelte';
     import { onMount } from 'svelte';
@@ -240,20 +240,36 @@
             }
             
             const data = await response.json();
+            
+            // Handle different response types
+            let responseContent: string | EmailTemplate;
+            if (data.type === "email_template") {
+                responseContent = {
+                    type: "email_template",
+                    content: {
+                        message: data.content.message || "Here's your email template:",
+                        html: data.content.html
+                    }
+                };
+            } else {
+                responseContent = data.content || data.response;
+            }
+            
             const assistantMessage: ChatMessage = {
                 role: 'assistant',
-                content: data.response,
+                content: responseContent,
                 timestamp: new Date()
             };
             
             // Add assistant message to display
             chatMessages = [...chatMessages, assistantMessage];
+            
         } catch (error) {
             console.error('Error in chat:', error);
             // Add error message to chat
             chatMessages = [...chatMessages, {
                 role: 'assistant',
-                content: 'Sorry, I encountered an error. Please try again.',
+                content: 'I apologize, but I encountered an error. Please try again.',
                 timestamp: new Date()
             }];
         } finally {
@@ -416,8 +432,7 @@
     }
 
     // Function to apply HTML to the editor
-    function applyHtmlToEditor(content: string) {
-        const html = extractHtml(content);
+    function applyHtmlToEditor(html: string | null): void {
         if (!html) {
             console.error('No valid HTML content found to apply to editor');
             dispatch('update', { 
@@ -448,14 +463,16 @@
     }
 
     // Function to highlight @filename mentions in user messages
-    function highlightMentions(content: string): string {
-        // Regular expression to match @filename patterns
-        const mentionRegex = /@([^\s@]+)/g;
-        
-        // Replace @filename with highlighted version
-        return content.replace(mentionRegex, (match) => {
-            return `<span class="text-purple-400 font-semibold">${match}</span>`;
-        });
+    function highlightMentions(content: string | EmailTemplate | TextResponse): string {
+        if (typeof content === 'string') {
+            return content.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+        } else if (isTextResponse(content)) {
+            return content.content.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+        } else if (isEmailTemplate(content)) {
+            const text = content.content.message || '';
+            return text.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+        }
+        return '';
     }
 
     function handleContextMention(event: CustomEvent<string>) {
@@ -604,6 +621,29 @@
             console.error('Error creating chat session:', error);
         }
     }
+
+    // Add this helper function at the top with other functions
+    function isEmailTemplate(content: string | EmailTemplate | TextResponse): content is EmailTemplate {
+        return typeof content !== 'string' && content.type === 'email_template';
+    }
+
+    function isTextResponse(content: string | EmailTemplate | TextResponse): content is TextResponse {
+        return typeof content !== 'string' && content.type === 'text';
+    }
+
+    function getMessageDisplay(content: string | EmailTemplate): string {
+        if (typeof content === 'string') {
+            return content;
+        }
+        return content.content.message || 'Here is your email template:';
+    }
+
+    function getHtmlContent(message: ChatMessage): string | null {
+        if (!isEmailTemplate(message.content)) {
+            return null;
+        }
+        return message.content.content.html;
+    }
 </script>
 
 <div 
@@ -646,7 +686,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                         <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
-            </svg>
+                    </svg>
                     {#if sessions.length > 0}
                         <span class="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
                             {sessions.length}
@@ -661,7 +701,7 @@
                     <span class="text-xs text-gray-400">Current chat:</span>
                     <span class="text-xs text-white font-medium truncate max-w-[150px]">
                         {sessions.find(s => s.id === currentSessionId)?.name || 'Untitled Chat'}
-        </span>
+                    </span>
                 </div>
             {:else}
                 <span class="text-xs text-gray-500 italic">No active chat session</span>
@@ -711,8 +751,8 @@
                         />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-1">Type</label>
-                        <div class="grid grid-cols-2 gap-2">
+                        <label for="emailType" class="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                        <div class="grid grid-cols-2 gap-2" id="emailType" role="radiogroup" aria-label="Email type selection">
                             <button
                                 type="button"
                                 class="px-3 py-2 rounded-md text-sm font-medium text-center transition-colors {emailType === 'newsletter' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}"
@@ -757,7 +797,7 @@
                 <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-medium text-white">Chat History</h3>
                     <span class="text-xs text-gray-400">{sessions.length} chats</span>
-            </div>
+                </div>
                 
                 {#if sessions.length === 0}
                     <div class="text-center py-4">
@@ -769,7 +809,7 @@
                             Create your first chat
                         </button>
                     </div>
-                                {:else}
+                {:else}
                     <div class="space-y-1">
                         {#each sessions as session}
                             <div 
@@ -814,25 +854,45 @@
                                 </button>
                             </div>
                         {/each}
-                                    </div>
-                                {/if}
+                    </div>
+                {/if}
             </div>
-                            </div>
-                        {/if}
+        </div>
+    {/if}
 
     <!-- Chat Messages -->
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
         {#each chatMessages as message}
-            <div class="flex flex-col {message.role === 'user' ? 'items-end' : 'items-start'}">
-                {#if message.role === 'user'}
-                    <div class="bg-purple-600/20 text-white rounded-lg px-4 py-2 max-w-[80%] break-words">
-                        {message.content}
-                    </div>
-                {:else}
-                    <div class="text-white max-w-[80%] break-words space-y-2">
-                        {message.content}
+            <div class="message {message.role}" transition:fade>
+                <div class="message-content">
+                    {#if typeof message.content === 'string'}
+                        {@html highlightMentions(message.content)}
+                    {:else if isTextResponse(message.content)}
+                        {@html highlightMentions(message.content.content)}
+                    {:else if isEmailTemplate(message.content)}
+                        <!-- Show conversational message -->
+                        {@html highlightMentions(message.content.content.message || '')}
+                        
+                        <!-- Only show HTML template capsule if we have HTML content -->
+                        {#if message.content.content.html}
+                            <div class="html-template-capsule">
+                                <div class="capsule-header">
+                                    <span>📧 Email Template</span>
+                                    <button 
+                                        class="apply-template-btn"
+                                        on:click={() => {
+                                            if (isEmailTemplate(message.content)) {
+                                                dispatch('update', { applyHtml: message.content.content.html });
+                                            }
+                                        }}
+                                    >
+                                        Apply to Editor
+                                    </button>
+                                </div>
+                            </div>
+                        {/if}
+                    {/if}
                 </div>
-                {/if}
             </div>
         {/each}
         
@@ -859,23 +919,23 @@
                             {:else}
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
-                    </svg>
+                                </svg>
                             {/if}
                             <span class="text-[11px] text-gray-300 truncate max-w-[100px]">{context.name}</span>
-                    <button 
+                            <button 
                                 class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                 on:click={() => removeContext(context.id)}
                                 aria-label="Remove {context.name}"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
+                                </svg>
+                            </button>
                         </div>
-                            {/each}
-                        </div>
-                    </div>
-                {/if}
+                    {/each}
+                </div>
+            </div>
+        {/if}
 
         <!-- Input Box -->
         <div class="p-2">
@@ -888,8 +948,8 @@
                     class="flex-1 bg-[#1a1a1a] text-white placeholder-gray-500 rounded px-3 py-1.5 focus:outline-none resize-none text-sm min-h-[36px]"
                     rows="1"
                 ></textarea>
-            <button
-                on:click={handleChat}
+                <button
+                    on:click={handleChat}
                     disabled={isGenerating}
                     class="p-1.5 rounded bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Send message"
@@ -897,7 +957,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                     </svg>
-            </button>
+                </button>
             </div>
         </div>
     </div>
@@ -918,5 +978,95 @@
     textarea {
         min-height: 24px;
         max-height: 96px;
+    }
+
+    .message {
+        margin-bottom: 1rem;
+    }
+    
+    .message.user {
+        text-align: right;
+    }
+    
+    .message-content {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        max-width: 80%;
+    }
+    
+    .user .message-content {
+        background-color: rgba(147, 51, 234, 0.2);
+    }
+    
+    .assistant .message-content {
+        background-color: rgba(75, 85, 99, 0.2);
+    }
+    
+    .mention {
+        color: rgb(192, 132, 252);
+        font-weight: 600;
+    }
+    
+    .email-template {
+        margin-top: 0.5rem;
+    }
+    
+    .apply-template-btn {
+        background-color: #9333ea;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        margin-top: 8px;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+    
+    .apply-template-btn:hover {
+        background-color: #7e22ce;
+    }
+
+    .message-content {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .html-template-capsule {
+        margin-top: 8px;
+        background: rgba(147, 51, 234, 0.1);
+        border: 1px solid rgba(147, 51, 234, 0.2);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .capsule-header {
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(147, 51, 234, 0.15);
+        border-bottom: 1px solid rgba(147, 51, 234, 0.2);
+    }
+
+    .capsule-header span {
+        font-size: 12px;
+        color: #c084fc;
+    }
+
+    .apply-template-btn {
+        background-color: #9333ea;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        transition: background-color 0.2s;
+    }
+
+    .apply-template-btn:hover {
+        background-color: #7e22ce;
     }
 </style> 
