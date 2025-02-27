@@ -58,6 +58,7 @@
             const response = await fetch(`${PUBLIC_API_URL}/send-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                mode: 'cors',
                 body: JSON.stringify({
                     content: htmlContent,
                     recipients: activeGroup.recipients,

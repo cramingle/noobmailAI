@@ -115,6 +115,7 @@
             const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 mode: 'cors'
             });
 
@@ -135,6 +136,7 @@
             const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 mode: 'cors',
                 body: JSON.stringify({ name: 'New Chat', email_type: emailType })
             });
@@ -157,6 +159,7 @@
             const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions/${sessionId}/messages`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 mode: 'cors'
             });
             if (response.ok) {
@@ -177,6 +180,7 @@
             const response = await fetch(`${PUBLIC_AI_SERVICE_URL}/chat-sessions/${sessionId}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 mode: 'cors'
             });
             
@@ -213,6 +217,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 mode: 'cors',
                 body: JSON.stringify({
                     prompt: messageToSend,
@@ -447,6 +452,7 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 mode: 'cors',
                 body: JSON.stringify({
                     name: newChatName,

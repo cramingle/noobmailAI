@@ -3,9 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict, Any
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formatdate, make_msgid, formataddr
 from email_service import send_email, improve_content
 from ai_service import ai_service
 import os
@@ -14,6 +11,10 @@ import re
 from scheduler_service import NewsletterSchedulerService
 from datetime import datetime
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -21,21 +22,17 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SimpleMail AI")
 
-# Get allowed origins from environment or use defaults
-ALLOWED_ORIGINS = os.environ.get(
-    "ALLOWED_ORIGINS", 
-    "http://localhost:5173,http://localhost:3000,https://noobmail.ai,https://noobmail-ai.vercel.app"
-).split(",")
+# Get allowed origins from environment variable or use default
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://yourdomain.com").split(",")
 
-# CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Allow both dev and production
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
-    expose_headers=["Content-Type"],
-    max_age=3600,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 # Models

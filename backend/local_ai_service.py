@@ -63,20 +63,22 @@ Remember:
 2. When asked to create an email, ALWAYS provide complete HTML/CSS
 3. Focus on modern, responsive design that works across email clients."""
 
+# Get allowed origins from environment variable or use default
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://yourdomain.com").split(",")
+
 app = FastAPI()
 
 # Create database session
 SessionLocal = sessionmaker(bind=engine)
 
-# Enable CORS for local development
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "https://noobmail.ai", "https://noobmail-ai.vercel.app"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
-    expose_headers=["Content-Type"],
-    max_age=3600,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 class ChatMessageModel(BaseModel):
