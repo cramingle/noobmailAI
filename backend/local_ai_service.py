@@ -14,11 +14,13 @@ import os
 from dotenv import load_dotenv # type: ignore
 
 # Load environment variables
-load_dotenv()
+env_file = os.getenv('ENV_FILE', '.env')
+load_dotenv(env_file)
+logger = logging.getLogger(__name__)
+logger.info(f"Loading environment from: {env_file}")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Ollama API Configuration
 OLLAMA_API = os.getenv('OLLAMA_API_URL', 'http://localhost:11434/api/chat')
@@ -64,7 +66,13 @@ Remember:
 3. Focus on modern, responsive design that works across email clients."""
 
 # Get allowed origins from environment variable or use default
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://yourdomain.com").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS")
+if not ALLOWED_ORIGINS:
+    logger.warning("ALLOWED_ORIGINS not set in environment, using default values")
+    ALLOWED_ORIGINS = "http://localhost:5173,http://localhost:3000,https://noobmail.zirodelta.com"
+
+logger.info(f"Configured ALLOWED_ORIGINS: {ALLOWED_ORIGINS}")
+ALLOWED_ORIGINS = ALLOWED_ORIGINS.split(",")
 
 app = FastAPI()
 
